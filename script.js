@@ -548,21 +548,26 @@ async function markMessagesAsRead() {
 
 function showBrowserNotification(senderName, messageText) {
     if ('Notification' in window && Notification.permission === 'granted') {
+        let cleanText = messageText;
+        if (cleanText && cleanText.startsWith('[GAME_')) {
+            cleanText = 'Mengajak / memperbarui permainan';
+        }
+
         if (navigator.serviceWorker && navigator.serviceWorker.controller) {
             navigator.serviceWorker.ready.then(registration => {
                 registration.showNotification(`Pesan dari @${senderName}`, {
-                    body: messageText,
+                    body: cleanText,
                     icon: 'https://cdn-icons-png.flaticon.com/512/1041/1041916.png',
                     badge: 'https://cdn-icons-png.flaticon.com/512/1041/1041916.png',
                     vibrate: [200, 100, 200],
-                    tag: 'chat-notification'
+                    tag: 'chat-notification',
+                    renotify: true
                 });
+            }).catch(() => {
+                new Notification(`Pesan dari @${senderName}`, { body: cleanText });
             });
         } else {
-            new Notification(`Pesan dari @${senderName}`, {
-                body: messageText,
-                icon: 'https://cdn-icons-png.flaticon.com/512/1041/1041916.png'
-            });
+            new Notification(`Pesan dari @${senderName}`, { body: cleanText });
         }
     }
 }
