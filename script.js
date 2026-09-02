@@ -216,8 +216,9 @@ async function enterChatRoom() {
     
     await loadParticipantsAndHeader();
     await loadMessages();
-    await markMessagesAsRead();
     subscribeToRealtime();
+    // Jalankan setelah subscribe aktif agar event update tertangkap
+    await markMessagesAsRead();
 }
 
 async function loadParticipantsAndHeader() {
@@ -250,12 +251,23 @@ async function loadMessages() {
 }
 
 async function markMessagesAsRead() {
-    await supabaseClient
+    // Ambil semua pesan yang dikirim oleh partner dan statusnya masih 'sent'
+    const { data: unreadMsgs } = await supabaseClient
         .from('messages')
-        .update({ status: 'read' })
+        .select('id')
         .eq('room_id', currentRoomId)
         .neq('sender_id', sessionId)
         .eq('status', 'sent');
+
+    if (unreadMsgs && unreadMsgs.length > 0) {
+        for (let msg of unreadMsgs) {
+            // Update satu per satu menggunakan ID agar mentrigger realtime broadcast dengan akurat
+            await supabaseClient
+                .from('messages')
+                .update({ status: 'read' })
+                .eq('id', msg.id);
+        }
+    }
 }
 
 function appendMessage(msg) {
@@ -269,10 +281,17 @@ function appendMessage(msg) {
     }
 
     if (msgEl) {
-        const statusEl = msgEl.querySelector('.msg-status');
-        if (statusEl) {
-            statusEl.className = `msg-status ${msg.status === 'read' ? 'read' : ''}`;
-            statusEl.textContent = msg.status === 'read' ? '✓✓' : '✓';
+        const footerEl = msgEl.querySelector('.msg-footer');
+        if (footerEl) {
+            let existingStatusEl = footerEl.querySelector('.msg-status');
+            if (isOutgoing) {
+                if (existingStatusEl) {
+                    existingStatusEl.className = `msg-status ${msg.status === 'read' ? 'read' : ''}`;
+                    existingStatusEl.textContent = msg.status === 'read' ? '✓✓' : '✓';
+                } else {
+                    footerEl.insertAdjacentHTML('beforeend', `<span class="msg-status ${msg.status === 'read' ? 'read' : ''}">${msg.status === 'read' ? '✓✓' : '✓'}</span>`);
+                }
+            }
         }
         return;
     }
@@ -348,6 +367,7 @@ function subscribeToRealtime() {
         }, payload => {
             if (payload && payload.new) {
                 appendMessage(payload.new);
+                // Jika pesan baru masuk dan kita sedang di room, langsung ubah statusnya jadi read via ID
                 if (payload.new.sender_id !== sessionId) {
                     supabaseClient
                         .from('messages')
