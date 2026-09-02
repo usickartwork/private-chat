@@ -323,7 +323,7 @@ async function loadFriends() {
     const { data: friendships } = await supabaseClient.from('friendships').select('friend_id').eq('user_id', currentUserId);
     if (!friendships || friendships.length === 0) {
         if (!friendsList.hasChildNodes() || friendsList.innerHTML.includes('Belum ada')) {
-            friendsList.innerHTML = '<p style="padding: 20px; text-align: center; color: #888; font-size: 13px;">Belum ada teman.</p>';
+            friendsList.innerHTML = '<p style="padding: 24px; text-align: center; color: #888; font-size: 13px; animation: fadeIn 0.3s ease;">Belum ada teman.</p>';
         }
         return;
     }
@@ -706,7 +706,7 @@ async function sendMessage() {
 
     const replyId = replyingToMessageId;
     currentInput.value = '';
-    currentInput.style.height = 'auto'; // Reset tinggi textarea setelah kirim
+    currentInput.style.height = 'auto';
     cancelReply();
 
     if (typingChannel) {
@@ -771,7 +771,6 @@ function setupTypingIndicator() {
         });
 
         freshInput.addEventListener('input', function() {
-            // Auto-resize tinggi textarea
             this.style.height = 'auto';
             this.style.height = (this.scrollHeight) + 'px';
 
