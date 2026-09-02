@@ -265,6 +265,19 @@ btnAddFriend.addEventListener('click', async () => {
     const { data: targetUser, error: searchError } = await supabaseClient.from('profiles').select('*').eq('username', targetUsername).single();
     if (searchError || !targetUser) { homeError.textContent = 'Username tidak ditemukan!'; return; }
 
+    // Cek apakah sudah berteman sebelumnya
+    const { data: existingFriend } = await supabaseClient
+        .from('friendships')
+        .select('*')
+        .eq('user_id', currentUserId)
+        .eq('friend_id', targetUser.id)
+        .single();
+
+    if (existingFriend) {
+        homeError.textContent = 'Teman sudah ada di daftar kontak!';
+        return;
+    }
+
     await supabaseClient.from('friendships').insert([
         { user_id: currentUserId, friend_id: targetUser.id },
         { user_id: targetUser.id, friend_id: currentUserId }
