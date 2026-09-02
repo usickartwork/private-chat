@@ -11,7 +11,7 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 100vh;
+    height: 100dvh; /* Menggunakan dynamic viewport height agar pas saat keyboard muncul */
     overflow: hidden;
 }
 
@@ -19,7 +19,7 @@ body {
     display: none;
     width: 100%;
     max-width: 480px;
-    height: 100vh;
+    height: 100dvh;
     background: #ffffff;
     flex-direction: column;
     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
@@ -68,7 +68,7 @@ input[type="text"] {
     padding: 12px 14px;
     border: 1px solid #ddd;
     border-radius: 8px;
-    font-size: 15px;
+    font-size: 16px; /* Ukuran 16px mencegah browser iOS/Android melakukan zoom otomatis */
     outline: none;
     transition: border-color 0.2s;
 }
@@ -140,6 +140,7 @@ input[type="text"]:focus {
     background: #ffffff;
     border-bottom: 1px solid #eee;
     gap: 12px;
+    flex-shrink: 0;
 }
 
 .btn-icon {
@@ -169,6 +170,7 @@ input[type="text"]:focus {
     display: flex;
     flex-direction: column;
     gap: 8px;
+    -webkit-overflow-scrolling: touch;
 }
 
 .message-item {
@@ -217,10 +219,11 @@ input[type="text"]:focus {
 
 .chat-input-area {
     display: flex;
-    padding: 12px;
+    padding: 10px 12px;
     background: #ffffff;
     border-top: 1px solid #eee;
     gap: 8px;
+    flex-shrink: 0;
 }
 
 .chat-input-area input {
@@ -229,7 +232,7 @@ input[type="text"]:focus {
     border: 1px solid #ddd;
     border-radius: 20px;
     outline: none;
-    font-size: 14px;
+    font-size: 16px; /* Wajib 16px untuk mencegah zoom di HP */
 }
 
 .btn-send {

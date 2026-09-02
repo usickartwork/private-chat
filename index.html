@@ -2,12 +2,11 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Private Chat</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- Screen 1: Home / Login / Create Room -->
     <div id="home-screen" class="screen active">
         <div class="card">
             <h2>Private Chat</h2>
@@ -36,7 +35,6 @@
         </div>
     </div>
 
-    <!-- Screen 2: Chat Room -->
     <div id="chat-screen" class="screen">
         <div class="chat-header">
             <button id="btn-back" class="btn-icon">←</button>
@@ -46,9 +44,7 @@
             </div>
         </div>
 
-        <div id="chat-messages" class="chat-messages">
-            <!-- Pesan akan masuk di sini secara dinamis -->
-        </div>
+        <div id="chat-messages" class="chat-messages"></div>
 
         <div class="chat-input-area">
             <input type="text" id="message-input" placeholder="Ketik pesan..." autocomplete="off">
@@ -56,7 +52,6 @@
         </div>
     </div>
 
-    <!-- Supabase CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="script.js"></script>
 </body>
