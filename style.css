@@ -323,22 +323,57 @@ input[type="text"]:focus, input[type="password"]:focus {
     display: flex;
     flex-direction: column;
     animation: messageAppear 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    cursor: pointer;
 }
 
 .message-item.incoming {
     background: #ffffff;
     align-self: flex-start;
     border: 1px solid #e1e4e8;
+    color: #111;
 }
 
+/* WARNA BIRU MODERN UNTUK PENGIRIM */
 .message-item.outgoing {
-    background: #dcf8c6;
+    background: #0084ff;
     align-self: flex-end;
+    color: white;
+}
+
+.message-item.outgoing .msg-text {
+    color: white;
+}
+
+.message-item.outgoing .msg-time,
+.message-item.outgoing .msg-status {
+    color: rgba(255, 255, 255, 0.8);
 }
 
 .msg-text {
     font-size: 14px;
-    color: #111;
+}
+
+/* STYLE KUTIPAN REPLY DALAM GELEMBUNG PESAN */
+.quoted-msg {
+    background: rgba(0, 0, 0, 0.06);
+    border-left: 3px solid #007bff;
+    padding: 4px 8px;
+    margin-bottom: 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #555;
+}
+
+.message-item.outgoing .quoted-msg {
+    background: rgba(255, 255, 255, 0.2);
+    border-left-color: #ffffff;
+    color: #f1f1f1;
+}
+
+.quoted-sender {
+    font-weight: bold;
+    display: block;
+    margin-bottom: 2px;
 }
 
 .msg-footer {
@@ -361,17 +396,59 @@ input[type="text"]:focus, input[type="password"]:focus {
 }
 
 .msg-status.read {
+    color: #b3e0ff;
+}
+
+.message-item.incoming .msg-status.read {
     color: #027eb5;
+}
+
+/* CONTAINER INPUT & PANEL REPLY PREVIEW */
+.chat-input-container {
+    display: flex;
+    flex-direction: column;
+    background: #ffffff;
+    border-top: 1px solid #eee;
+    flex-shrink: 0;
+}
+
+.reply-preview-box {
+    display: none;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: #f1f3f5;
+    border-left: 4px solid #0084ff;
+    font-size: 13px;
+}
+
+.reply-preview-box.active {
+    display: flex;
+}
+
+.reply-preview-content {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #444;
+}
+
+.btn-cancel-reply {
+    background: none;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    color: #666;
+    padding-left: 8px;
 }
 
 .chat-input-area {
     display: flex;
-    padding: 14px 16px;
+    padding: 12px 16px;
     padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px));
-    background: #ffffff;
-    border-top: 1px solid #eee;
     gap: 8px;
-    flex-shrink: 0;
+    align-items: center;
 }
 
 .chat-input-area input {
@@ -385,7 +462,8 @@ input[type="text"]:focus, input[type="password"]:focus {
 
 .btn-send {
     padding: 0 16px;
-    background: #007bff;
+    height: 42px;
+    background: #0084ff;
     color: white;
     border: none;
     border-radius: 20px;
@@ -394,5 +472,5 @@ input[type="text"]:focus, input[type="password"]:focus {
 }
 
 .btn-send:hover {
-    background: #0056b3;
+    background: #006dd9;
 }

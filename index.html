@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Private Chat - Auth</title>
+    <title>Private Chat - Blue & Reply</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -28,7 +28,7 @@
         </div>
     </div>
 
-    <!-- 2. SCREEN: BUAT AKUN (REGISTER) -->
+    <!-- 2. SCREEN: REGISTER -->
     <div id="register-screen" class="screen">
         <div class="card">
             <h2>Buat Akun</h2>
@@ -53,7 +53,7 @@
         </div>
     </div>
 
-    <!-- 3. SCREEN: DAFTAR TEMAN & CHAT LIST -->
+    <!-- 3. SCREEN: HOME / CONTACT LIST -->
     <div id="home-screen" class="screen">
         <div class="home-header">
             <div>
@@ -73,7 +73,7 @@
         <div id="friends-list" class="friends-list"></div>
     </div>
 
-    <!-- 4. SCREEN: RUANG CHAT PRIVAT -->
+    <!-- 4. SCREEN: CHAT ROOM (DENGAN FITUR REPLY) -->
     <div id="chat-screen" class="screen">
         <div class="chat-header">
             <button id="btn-back" class="btn-icon">←</button>
@@ -85,9 +85,19 @@
 
         <div id="chat-messages" class="chat-messages"></div>
 
-        <div class="chat-input-area">
-            <input type="text" id="message-input" placeholder="Ketik pesan..." autocomplete="off">
-            <button id="btn-send" class="btn-send">Kirim</button>
+        <!-- Panel Input & Reply Preview -->
+        <div class="chat-input-container">
+            <div id="reply-preview-box" class="reply-preview-box">
+                <div class="reply-preview-content">
+                    <strong id="replying-to-user">Membalas...</strong>
+                    <span id="replying-to-text">Pesanan...</span>
+                </div>
+                <button id="btn-cancel-reply" class="btn-cancel-reply">✕</button>
+            </div>
+            <div class="chat-input-area">
+                <input type="text" id="message-input" placeholder="Ketik pesan..." autocomplete="off">
+                <button id="btn-send" class="btn-send">Kirim</button>
+            </div>
         </div>
     </div>
 
