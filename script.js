@@ -76,15 +76,32 @@ const optCancel = document.getElementById('opt-cancel');
 let messageCache = {};
 
 window.addEventListener('DOMContentLoaded', async () => {
+    // Inisialisasi History State agar tombol back device terpantau
+    history.replaceState({ screen: 'home' }, '');
+
     if (currentUserId && currentUsername) {
         const { data } = await supabaseClient.from('profiles').select('*').eq('id', currentUserId).single();
         if (data) {
             currentUserAvatar = data.avatar_url;
             saveLocalStorage();
-            showHomeScreen();
+            showHomeScreen(false);
         } else {
             clearLocalStorage();
         }
+    }
+});
+
+// PENGATURAN TOMBOL BACK HARDWARE / GESTURE HP
+window.addEventListener('popstate', (event) => {
+    const state = event.state;
+    if (!state || state.screen === 'home') {
+        if (chatScreen.classList.contains('active')) {
+            closeChatRoom(false);
+        } else if (profileScreen.classList.contains('active')) {
+            closeProfileScreen(false);
+        }
+    } else if (state.screen === 'chat') {
+        // Jika user melakukan swipe back ke chat
     }
 });
 
@@ -127,10 +144,10 @@ btnLogin.addEventListener('click', async () => {
     currentUsername = user.username;
     currentUserAvatar = user.avatar_url;
     saveLocalStorage();
-    showHomeScreen();
+    showHomeScreen(true);
 });
 
-function showHomeScreen() {
+function showHomeScreen(pushHistory = true) {
     loginScreen.classList.remove('active');
     registerScreen.classList.remove('active');
     profileScreen.classList.remove('active');
@@ -138,8 +155,11 @@ function showHomeScreen() {
     homeScreen.classList.add('active');
     myProfileName.textContent = `@${currentUsername}`;
     renderAvatar(myHeaderAvatar, currentUserAvatar, currentUsername);
-    loadFriends(true);
+    loadFriends();
     subscribeHomeRealtime();
+    if (pushHistory) {
+        history.pushState({ screen: 'home' }, '');
+    }
 }
 
 // BUKA HALAMAN PROFIL
@@ -148,13 +168,19 @@ btnOpenProfile.addEventListener('click', () => {
     profileScreen.classList.add('active');
     renderProfileAvatar();
     profileStatus.textContent = '';
+    history.pushState({ screen: 'profile' }, '');
 });
 
 btnBackProfile.addEventListener('click', () => {
+    history.back();
+});
+
+function closeProfileScreen(pushHistory = true) {
     profileScreen.classList.remove('active');
     homeScreen.classList.add('active');
-    loadFriends(false);
-});
+    loadFriends();
+    if (pushHistory) history.replaceState({ screen: 'home' }, '');
+}
 
 function renderProfileAvatar() {
     if (currentUserAvatar) {
@@ -248,21 +274,26 @@ btnAddFriend.addEventListener('click', async () => {
         { user_id: targetUser.id, friend_id: currentUserId }
     ]);
     friendUsernameInput.value = '';
-    loadFriends(true);
+    loadFriends();
 });
 
-// MUAT DAFTAR TEMAN
-async function loadFriends(isInitial = false) {
+// MUAT DAFTAR TEMAN (Tanpa Kedip / In-place update)
+async function loadFriends() {
     const { data: friendships } = await supabaseClient.from('friendships').select('friend_id').eq('user_id', currentUserId);
     if (!friendships || friendships.length === 0) {
-        if (isInitial) friendsList.innerHTML = '<p style="padding: 20px; text-align: center; color: #888; font-size: 13px;">Belum ada teman.</p>';
+        if (!friendsList.hasChildNodes() || friendsList.innerHTML.includes('Belum ada')) {
+            friendsList.innerHTML = '<p style="padding: 20px; text-align: center; color: #888; font-size: 13px;">Belum ada teman.</p>';
+        }
         return;
     }
 
     const friendIds = friendships.map(f => f.friend_id);
     const { data: friendsProfiles } = await supabaseClient.from('profiles').select('*').in('id', friendIds);
     if (!friendsProfiles) return;
-    if (isInitial) friendsList.innerHTML = '';
+
+    if (friendsList.innerHTML.includes('Belum ada')) {
+        friendsList.innerHTML = '';
+    }
 
     for (const friend of friendsProfiles) {
         const { data: lastMsgs } = await supabaseClient
@@ -356,6 +387,21 @@ async function openChatRoom(friendId, friendName, friendAvatar) {
     await loadMessages();
     await markMessagesAsRead();
     subscribeToRealtime();
+
+    history.pushState({ screen: 'chat' }, '');
+}
+
+btnBack.addEventListener('click', () => {
+    history.back();
+});
+
+function closeChatRoom(pushHistory = true) {
+    if (chatSubscription) supabaseClient.removeChannel(chatSubscription);
+    chatScreen.classList.remove('active');
+    homeScreen.classList.add('active');
+    loadFriends();
+    subscribeHomeRealtime();
+    if (pushHistory) history.replaceState({ screen: 'home' }, '');
 }
 
 async function loadMessages() {
@@ -595,7 +641,7 @@ function subscribeHomeRealtime() {
     homeSubscription = supabaseClient
         .channel(`home-${currentUserId}`)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${currentUserId}` }, () => {
-            if (homeScreen.classList.contains('active')) loadFriends(false);
+            if (homeScreen.classList.contains('active')) loadFriends();
         })
         .subscribe();
 }
@@ -607,7 +653,7 @@ document.addEventListener("visibilitychange", async () => {
             await markMessagesAsRead();
             subscribeToRealtime();
         } else if (homeScreen.classList.contains('active')) {
-            loadFriends(false);
+            loadFriends();
             subscribeHomeRealtime();
         }
     }
@@ -627,14 +673,6 @@ function clearLocalStorage() {
     currentUsername = null;
     currentUserAvatar = null;
 }
-
-btnBack.addEventListener('click', () => {
-    if (chatSubscription) supabaseClient.removeChannel(chatSubscription);
-    chatScreen.classList.remove('active');
-    homeScreen.classList.add('active');
-    loadFriends(true);
-    subscribeHomeRealtime();
-});
 
 btnLogout.addEventListener('click', () => {
     clearLocalStorage();
