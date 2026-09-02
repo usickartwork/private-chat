@@ -92,7 +92,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-// PENGATURAN TOMBOL BACK / GESTURE DEVICE TANPA KEDIP
+// PENGATURAN TOMBOL BACK / GESTURE DEVICE
 window.addEventListener('popstate', (event) => {
     messageOptionsModal.classList.remove('active');
 
@@ -286,7 +286,7 @@ btnAddFriend.addEventListener('click', async () => {
     loadFriends();
 });
 
-// MUAT DAFTAR TEMAN (In-place update tanpa kedip)
+// MUAT DAFTAR TEMAN
 async function loadFriends() {
     if (!currentUserId) return;
 
@@ -381,7 +381,7 @@ async function loadFriends() {
     }
 }
 
-// BUKA RUANG CHAT
+// BUKA RUANG CHAT (Langsung tampil tanpa jeda/kedip pembersihan awal)
 async function openChatRoom(friendId, friendName, friendAvatar) {
     if (homeSubscription) supabaseClient.removeChannel(homeSubscription);
 
@@ -390,16 +390,24 @@ async function openChatRoom(friendId, friendName, friendAvatar) {
     activeFriendAvatar = friendAvatar;
     cancelReply();
 
+    // Langsung set tampilan aktif sebelum kueri database selesai
+    chatMessages.innerHTML = '';
+    messageCache = {};
+    chatPartnerName.textContent = `@${friendName}`;
+    renderAvatar(chatPartnerAvatarContainer, friendAvatar, friendName, '36px');
+    chatStatusIndicator.textContent = '...';
+
     history.pushState({ screen: 'chat' }, '');
     homeScreen.classList.remove('active');
     chatScreen.classList.add('active');
-    chatPartnerName.textContent = `@${friendName}`;
-    renderAvatar(chatPartnerAvatarContainer, friendAvatar, friendName, '36px');
 
-    await checkPartnerIdStatus(friendId);
+    // Ambil data status dan pesan di latar belakang secara paralel
+    await Promise.all([
+        checkPartnerIdStatus(friendId),
+        loadMessages()
+    ]);
+
     subscribePartnerStatus(friendId);
-
-    await loadMessages();
     await markMessagesAsRead();
     subscribeToRealtime();
 }
@@ -449,9 +457,6 @@ function closeChatRoomInternal(pushHistory = true) {
 }
 
 async function loadMessages() {
-    chatMessages.innerHTML = '';
-    messageCache = {};
-
     const { data: messages, error } = await supabaseClient
         .from('messages')
         .select('*')
