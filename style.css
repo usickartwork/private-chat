@@ -62,7 +62,7 @@ label {
     color: #444;
 }
 
-input[type="text"] {
+input[type="text"], input[type="password"] {
     width: 100%;
     padding: 12px 14px;
     border: 1px solid #ddd;
@@ -72,7 +72,7 @@ input[type="text"] {
     transition: border-color 0.2s;
 }
 
-input[type="text"]:focus {
+input[type="text"]:focus, input[type="password"]:focus {
     border-color: #007bff;
 }
 
@@ -85,6 +85,7 @@ input[type="text"]:focus {
     font-weight: 600;
     cursor: pointer;
     transition: background 0.2s;
+    margin-top: 8px;
 }
 
 .btn.primary {
@@ -101,6 +102,23 @@ input[type="text"]:focus {
     font-size: 13px;
     margin-top: 10px;
     text-align: center;
+}
+
+.switch-auth {
+    margin-top: 20px;
+    text-align: center;
+    font-size: 14px;
+    color: #666;
+}
+
+.switch-auth span {
+    color: #007bff;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.switch-auth span:hover {
+    text-decoration: underline;
 }
 
 /* Home / Contact Screen */
@@ -150,6 +168,7 @@ input[type="text"]:focus {
     width: auto;
     padding: 0 16px;
     border-radius: 8px;
+    margin-top: 0;
 }
 
 .section-title {
@@ -249,7 +268,7 @@ input[type="text"]:focus {
     text-align: center;
 }
 
-/* Chat Screen Styles */
+/* Chat Screen */
 .chat-header {
     display: flex;
     align-items: center;
@@ -291,14 +310,8 @@ input[type="text"]:focus {
 }
 
 @keyframes messageAppear {
-    from {
-        opacity: 0;
-        transform: translateY(12px) scale(0.95);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-    }
+    from { opacity: 0; transform: translateY(12px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .message-item {

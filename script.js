@@ -10,25 +10,32 @@ let currentUserId = localStorage.getItem('chat_user_id') || null;
 let currentUsername = localStorage.getItem('chat_username') || null;
 let activeFriendId = null;
 let activeFriendName = null;
-let sessionId = localStorage.getItem('chat_session_id');
-
-if (!sessionId) {
-    sessionId = 'sess_' + Math.random().toString(36).substring(2, 15);
-    localStorage.setItem('chat_session_id', sessionId);
-}
 
 let chatSubscription = null;
 let homeSubscription = null;
 
 // DOM Elements
-const setupScreen = document.getElementById('setup-screen');
+const loginScreen = document.getElementById('login-screen');
+const registerScreen = document.getElementById('register-screen');
 const homeScreen = document.getElementById('home-screen');
 const chatScreen = document.getElementById('chat-screen');
 
-const createUsernameInput = document.getElementById('create-username');
-const btnSaveUsername = document.getElementById('btn-save-username');
-const setupError = document.getElementById('setup-error');
+// Login Elements
+const loginUsernameInput = document.getElementById('login-username');
+const loginPasswordInput = document.getElementById('login-password');
+const btnLogin = document.getElementById('btn-login');
+const loginError = document.getElementById('login-error');
+const toRegisterBtn = document.getElementById('to-register');
 
+// Register Elements
+const regUsernameInput = document.getElementById('reg-username');
+const regPasswordInput = document.getElementById('reg-password');
+const regConfirmPasswordInput = document.getElementById('reg-confirm-password');
+const btnRegister = document.getElementById('btn-register');
+const regError = document.getElementById('reg-error');
+const toLoginBtn = document.getElementById('to-login');
+
+// Home & Chat Elements
 const myProfileName = document.getElementById('my-profile-name');
 const btnLogout = document.getElementById('btn-logout');
 const friendUsernameInput = document.getElementById('friend-username-input');
@@ -59,76 +66,118 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-// Penanganan viewport mobile
-if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', () => {
-        if (chatScreen.classList.contains('active')) {
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-    });
-}
-
-messageInput.addEventListener('blur', () => {
-    setTimeout(() => {
-        window.scrollTo(0, 0);
-        document.body.scrollTop = 0;
-    }, 100);
+// Navigasi antar form Login <-> Register
+toRegisterBtn.addEventListener('click', () => {
+    loginScreen.classList.remove('active');
+    registerScreen.classList.add('active');
+    loginError.textContent = '';
+    loginUsernameInput.value = '';
+    loginPasswordInput.value = '';
 });
 
-// 1. BUAT / MASUK DENGAN USERNAME
-btnSaveUsername.addEventListener('click', async () => {
-    const uname = createUsernameInput.value.trim().toLowerCase();
-    if (!uname) {
-        setupError.textContent = 'Masukkan username terlebih dahulu!';
+toLoginBtn.addEventListener('click', () => {
+    registerScreen.classList.remove('active');
+    loginScreen.classList.add('active');
+    regError.textContent = '';
+    regUsernameInput.value = '';
+    regPasswordInput.value = '';
+    regConfirmPasswordInput.value = '';
+});
+
+// 1. BUAT AKUN (REGISTER)
+btnRegister.addEventListener('click', async () => {
+    const username = regUsernameInput.value.trim().toLowerCase();
+    const password = regPasswordInput.value.trim();
+    const confirmPassword = regConfirmPasswordInput.value.trim();
+
+    if (!username || !password || !confirmPassword) {
+        regError.textContent = 'Semua kolom wajib diisi!';
         return;
     }
-    setupError.textContent = '';
 
-    const { data: existing } = await supabaseClient
+    if (password !== confirmPassword) {
+        regError.textContent = 'Konfirmasi password tidak cocok!';
+        return;
+    }
+
+    regError.textContent = '';
+
+    // Cek apakah username sudah ada
+    const { data: existingUser } = await supabaseClient
         .from('profiles')
         .select('*')
-        .eq('username', uname)
+        .eq('username', username)
         .single();
 
-    if (existing) {
-        if (existing.session_id === sessionId) {
-            currentUserId = existing.id;
-            currentUsername = existing.username;
-            saveLocalStorage();
-            showHomeScreen();
-        } else {
-            setupError.textContent = 'Username sudah digunakan orang lain. Pilih yang lain!';
-        }
+    if (existingUser) {
+        regError.textContent = 'Username sudah dipakai orang lain. Pilih yang lain!';
         return;
     }
 
-    const { data: newProfile, error } = await supabaseClient
+    // Insert akun baru ke database
+    const { error: insertError } = await supabaseClient
         .from('profiles')
-        .insert([{ username: uname, session_id: sessionId }])
-        .select()
-        .single();
+        .insert([{ username: username, password: password }]);
 
-    if (error) {
-        setupError.textContent = 'Gagal membuat akun. Coba lagi.';
+    if (insertError) {
+        regError.textContent = 'Gagal mendaftarkan akun. Coba lagi.';
         return;
     }
 
-    currentUserId = newProfile.id;
-    currentUsername = newProfile.username;
+    alert('Akun berhasil dibuat! Silakan masuk.');
+    // Kembali ke menu login
+    registerScreen.classList.remove('active');
+    loginScreen.classList.add('active');
+    regUsernameInput.value = '';
+    regPasswordInput.value = '';
+    regConfirmPasswordInput.value = '';
+});
+
+// 2. MASUK (LOGIN)
+btnLogin.addEventListener('click', async () => {
+    const username = loginUsernameInput.value.trim().toLowerCase();
+    const password = loginPasswordInput.value.trim();
+
+    if (!username || !password) {
+        loginError.textContent = 'Masukkan username dan password!';
+        return;
+    }
+
+    loginError.textContent = '';
+
+    const { data: user, error } = await supabaseClient
+        .from('profiles')
+        .select('*')
+        .eq('username', username)
+        .single();
+
+    if (error || !user) {
+        loginError.textContent = 'Username tidak ditemukan!';
+        return;
+    }
+
+    if (user.password !== password) {
+        loginError.textContent = 'Password salah!';
+        return;
+    }
+
+    currentUserId = user.id;
+    currentUsername = user.username;
     saveLocalStorage();
     showHomeScreen();
 });
 
 function showHomeScreen() {
-    setupScreen.classList.remove('active');
+    loginScreen.classList.remove('active');
+    registerScreen.classList.remove('active');
     chatScreen.classList.remove('active');
     homeScreen.classList.add('active');
     myProfileName.textContent = `@${currentUsername}`;
-    loadFriends(true); // Render penuh saat pertama kali masuk
+    loadFriends(true);
     subscribeHomeRealtime();
 }
 
-// 2. TAMBAH TEMAN BERDASARKAN USERNAME
+// 3. TAMBAH TEMAN
 btnAddFriend.addEventListener('click', async () => {
     const targetUsername = friendUsernameInput.value.trim().toLowerCase();
     if (!targetUsername) {
@@ -163,7 +212,7 @@ btnAddFriend.addEventListener('click', async () => {
     loadFriends(true);
 });
 
-// 3. MUAT DAFTAR TEMAN (SUPPORT PARTIAL UPDATE AGAR TIDAK KEDIP)
+// 4. MUAT DAFTAR TEMAN
 async function loadFriends(isInitial = false) {
     const { data: friendships, error } = await supabaseClient
         .from('friendships')
@@ -239,11 +288,9 @@ async function loadFriends(isInitial = false) {
         `;
 
         if (friendEl) {
-            // Update elemen yang ada tanpa merender ulang kontainer utama (mencegah kedip)
             friendEl.className = `friend-item ${isUnread ? 'unread' : ''}`;
             friendEl.innerHTML = contentHTML;
         } else {
-            // Buat elemen baru jika belum ada
             const div = document.createElement('div');
             div.id = `friend-${friend.id}`;
             div.className = `friend-item ${isUnread ? 'unread' : ''}`;
@@ -254,7 +301,7 @@ async function loadFriends(isInitial = false) {
     }
 }
 
-// 4. BUKA RUANG CHAT DENGAN TEMAN
+// 5. BUKA RUANG CHAT
 async function openChatRoom(friendId, friendName) {
     if (homeSubscription) {
         supabaseClient.removeChannel(homeSubscription);
@@ -368,7 +415,7 @@ messageInput.addEventListener('keypress', (e) => {
     }
 });
 
-// 5. REALTIME LISTENER DI HALAMAN CHAT
+// 6. REALTIME CHAT
 function subscribeToRealtime() {
     if (chatSubscription) {
         supabaseClient.removeChannel(chatSubscription);
@@ -417,7 +464,7 @@ function subscribeToRealtime() {
         .subscribe();
 }
 
-// 6. REALTIME LISTENER DI HALAMAN HOME (TANPA KEDIP)
+// 7. REALTIME HOME
 function subscribeHomeRealtime() {
     if (homeSubscription) {
         supabaseClient.removeChannel(homeSubscription);
@@ -432,7 +479,7 @@ function subscribeHomeRealtime() {
             filter: `receiver_id=eq.${currentUserId}`
         }, () => {
             if (homeScreen.classList.contains('active')) {
-                loadFriends(false); // Update parsial tanpa menghapus list
+                loadFriends(false);
             }
         })
         .subscribe();
