@@ -468,7 +468,6 @@ function subscribePartnerStatus(friendId) {
         }, payload => {
             if (payload && payload.new) {
                 const isOnline = payload.new.is_online;
-                // Hanya perbarui status jika partner tidak sedang mengetik
                 if (chatStatusIndicator.textContent !== 'Sedang mengetik...') {
                     chatStatusIndicator.textContent = isOnline ? 'Online' : 'Offline';
                     chatStatusIndicator.style.color = isOnline ? '#28a745' : '#888';
@@ -701,14 +700,14 @@ function escapeHtml(text) {
 }
 
 async function sendMessage() {
-    const text = messageInput.value.trim();
+    const currentInput = document.getElementById('message-input');
+    const text = currentInput ? currentInput.value.trim() : '';
     if (!text) return;
 
     const replyId = replyingToMessageId;
-    messageInput.value = '';
+    currentInput.value = '';
     cancelReply();
 
-    // Kirim sinyal berhenti mengetik saat pesan terkirim
     if (typingChannel) {
         typingChannel.send({
             type: 'broadcast',
@@ -730,11 +729,7 @@ if (btnSend) {
     btnSend.addEventListener('click', sendMessage);
 }
 
-if (messageInput) {
-    messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
-}
-
-// --- FITUR TYPING INDICATOR (SEDANG MENGETIK) ---
+// --- FITUR TYPING INDICATOR & HANDLING INPUT CHAT ---
 function setupTypingIndicator() {
     if (typingChannel) supabaseClient.removeChannel(typingChannel);
 
@@ -760,19 +755,22 @@ function setupTypingIndicator() {
         })
         .subscribe();
 
-    if (messageInput) {
-        // Hapus event listener lama agar tidak menumpuk
-        const newMsgInput = messageInput.cloneNode(true);
-        messageInput.parentNode.replaceChild(newMsgInput, messageInput);
+    const activeMsgInput = document.getElementById('message-input');
+    if (activeMsgInput) {
+        // Bersihkan event listener sebelumnya dengan clone node
+        const newMsgInput = activeMsgInput.cloneNode(true);
+        activeMsgInput.parentNode.replaceChild(newMsgInput, activeMsgInput);
         
-        // Re-assign referensi elemen input
-        const updatedMessageInput = document.getElementById('message-input');
+        const freshInput = document.getElementById('message-input');
         
-        updatedMessageInput.addEventListener('keypress', (e) => { 
-            if (e.key === 'Enter') sendMessage(); 
+        freshInput.addEventListener('keypress', (e) => { 
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                sendMessage();
+            }
         });
 
-        updatedMessageInput.addEventListener('input', () => {
+        freshInput.addEventListener('input', () => {
             if (!typingChannel) return;
 
             typingChannel.send({
