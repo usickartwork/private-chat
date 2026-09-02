@@ -76,7 +76,6 @@ const optCancel = document.getElementById('opt-cancel');
 let messageCache = {};
 
 window.addEventListener('DOMContentLoaded', async () => {
-    // Inisialisasi History State agar tombol back device terpantau
     history.replaceState({ screen: 'home' }, '');
 
     if (currentUserId && currentUsername) {
@@ -91,17 +90,22 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-// PENGATURAN TOMBOL BACK HARDWARE / GESTURE HP
+// PENGATURAN TOMBOL BACK HARDWARE / GESTURE HP TANPA JEDA
 window.addEventListener('popstate', (event) => {
     const state = event.state;
+    
+    // Tutup modal opsi jika terbuka
+    messageOptionsModal.classList.remove('active');
+
     if (!state || state.screen === 'home') {
-        if (chatScreen.classList.contains('active')) {
-            closeChatRoom(false);
-        } else if (profileScreen.classList.contains('active')) {
-            closeProfileScreen(false);
-        }
-    } else if (state.screen === 'chat') {
-        // Jika user melakukan swipe back ke chat
+        // Sembunyikan semua screen sub-halaman secara instan
+        chatScreen.classList.remove('active');
+        profileScreen.classList.remove('active');
+        homeScreen.classList.add('active');
+
+        if (chatSubscription) supabaseClient.removeChannel(chatSubscription);
+        loadFriends();
+        subscribeHomeRealtime();
     }
 });
 
@@ -174,13 +178,6 @@ btnOpenProfile.addEventListener('click', () => {
 btnBackProfile.addEventListener('click', () => {
     history.back();
 });
-
-function closeProfileScreen(pushHistory = true) {
-    profileScreen.classList.remove('active');
-    homeScreen.classList.add('active');
-    loadFriends();
-    if (pushHistory) history.replaceState({ screen: 'home' }, '');
-}
 
 function renderProfileAvatar() {
     if (currentUserAvatar) {
@@ -277,7 +274,7 @@ btnAddFriend.addEventListener('click', async () => {
     loadFriends();
 });
 
-// MUAT DAFTAR TEMAN (Tanpa Kedip / In-place update)
+// MUAT DAFTAR TEMAN
 async function loadFriends() {
     const { data: friendships } = await supabaseClient.from('friendships').select('friend_id').eq('user_id', currentUserId);
     if (!friendships || friendships.length === 0) {
@@ -394,15 +391,6 @@ async function openChatRoom(friendId, friendName, friendAvatar) {
 btnBack.addEventListener('click', () => {
     history.back();
 });
-
-function closeChatRoom(pushHistory = true) {
-    if (chatSubscription) supabaseClient.removeChannel(chatSubscription);
-    chatScreen.classList.remove('active');
-    homeScreen.classList.add('active');
-    loadFriends();
-    subscribeHomeRealtime();
-    if (pushHistory) history.replaceState({ screen: 'home' }, '');
-}
 
 async function loadMessages() {
     chatMessages.innerHTML = '';
