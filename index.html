@@ -3,57 +3,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Private Chat - 2 Orang</title>
+    <title>Private Chat</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
-    <div class="container">
-        <!-- Halaman Setup/Home -->
-        <div id="home-screen" class="screen active">
-            <h2>PRIVATE CHAT</h2>
-            <p class="subtitle">Aman, privat, maksimal 2 orang.</p>
-
+    <!-- Screen 1: Home / Login / Create Room -->
+    <div id="home-screen" class="screen active">
+        <div class="card">
+            <h2>Private Chat</h2>
+            <p class="subtitle">Aplikasi chat privat instan</p>
+            
             <div class="form-group">
                 <label for="username">Nama Kamu</label>
-                <input type="text" id="username" placeholder="Contoh: Filius" autocomplete="off">
+                <input type="text" id="username" placeholder="Masukkan namamu..." autocomplete="off">
             </div>
 
-            <button id="btn-create" class="btn primary">BUAT CHAT BARU</button>
+            <div class="divider"><span>ATAU</span></div>
 
-            <div class="divider">atau</div>
+            <div class="action-box">
+                <button id="btn-create" class="btn primary">Buat Chat Baru</button>
+            </div>
+
+            <div class="divider"><span>GABUNG ROOM</span></div>
 
             <div class="form-group">
                 <label for="room-code-input">Kode Room</label>
-                <input type="text" id="room-code-input" placeholder="Contoh: A7K92P" autocomplete="off" style="text-transform: uppercase;">
+                <input type="text" id="room-code-input" placeholder="Contoh: A9B2C1" maxlength="6" autocomplete="off" style="text-transform: uppercase;">
             </div>
+            <button id="btn-join" class="btn secondary">Gabung Chat</button>
 
-            <button id="btn-join" class="btn secondary">GABUNG CHAT</button>
-            <p id="error-msg" class="error-text"></p>
-        </div>
-
-        <!-- Halaman Chat Room -->
-        <div id="chat-screen" class="screen">
-            <div class="chat-header">
-                <button id="btn-back" class="btn-icon">←</button>
-                <div class="room-info">
-                    <span id="room-title">Private Chat</span>
-                    <span id="room-code-display" class="room-code-badge">Kode: -</span>
-                </div>
-            </div>
-
-            <div id="chat-messages" class="chat-messages">
-                <!-- Pesan akan muncul di sini secara dinamis -->
-            </div>
-
-            <div class="chat-input-area">
-                <input type="text" id="message-input" placeholder="Ketik pesan..." autocomplete="off">
-                <button id="btn-send" class="btn-send">➤</button>
-            </div>
+            <p id="error-msg" class="error"></p>
         </div>
     </div>
 
-    <!-- Panggil Supabase Client dari CDN -->
+    <!-- Screen 2: Chat Room -->
+    <div id="chat-screen" class="screen">
+        <div class="chat-header">
+            <button id="btn-back" class="btn-icon">←</button>
+            <div class="chat-info">
+                <h3 id="room-title">Memuat...</h3>
+                <span id="room-code-display">Kode: ------</span>
+            </div>
+        </div>
+
+        <div id="chat-messages" class="chat-messages">
+            <!-- Pesan akan masuk di sini secara dinamis -->
+        </div>
+
+        <div class="chat-input-area">
+            <input type="text" id="message-input" placeholder="Ketik pesan..." autocomplete="off">
+            <button id="btn-send" class="btn-send">Kirim</button>
+        </div>
+    </div>
+
+    <!-- Supabase CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="script.js"></script>
 </body>

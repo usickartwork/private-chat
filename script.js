@@ -38,10 +38,9 @@ if (currentUserName) {
     usernameInput.value = currentUserName;
 }
 
-// AUTO-RECONNECT: Jika sebelumnya sudah masuk room dan di-refresh, langsung pulihkan sesi
+// AUTO-RECONNECT
 window.addEventListener('DOMContentLoaded', async () => {
     if (currentRoomId && currentUserName) {
-        // Validasi apakah partisipan masih tercatat di database room tersebut
         const { data: partData } = await supabaseClient
             .from('participants')
             .select('*')
@@ -234,7 +233,6 @@ async function loadMessages() {
 }
 
 function appendMessage(msg) {
-    // Mencegah duplikasi pesan di layar
     if (document.getElementById(`msg-${msg.id}`)) return;
 
     const div = document.createElement('div');
@@ -293,7 +291,6 @@ messageInput.addEventListener('keypress', (e) => {
     }
 });
 
-// Realtime Subscription yang Diperbarui
 function subscribeToRealtime() {
     if (messageSubscription) {
         supabaseClient.removeChannel(messageSubscription);
