@@ -85,7 +85,7 @@ let isMyTurn = false;
 let mySymbol = '';
 let opponentSymbol = '';
 let gameActive = false;
-let activeGameSymbolsMap = {}; // Menyimpan pemetaan symbol X/O ke userId masing-sekarang
+let activeGameSymbolsMap = {};
 
 let messageCache = {};
 
@@ -421,6 +421,9 @@ async function openChatRoom(friendId, friendName, friendAvatar) {
     activeFriendAvatar = friendAvatar;
     cancelReply();
 
+    gameActive = false;
+    if (gameModal) gameModal.classList.remove('active');
+
     chatMessages.innerHTML = '';
     messageCache = {};
     chatPartnerName.textContent = `@${friendName}`;
@@ -498,10 +501,6 @@ async function loadMessages() {
             messageCache[msg.id] = msg;
             if (msg.sender_id === currentUserId && msg.deleted_for_sender) return;
             if (msg.receiver_id === currentUserId && msg.deleted_for_receiver) return;
-            
-            if (msg.message && msg.message.startsWith('[GAME_')) {
-                handleIncomingGameMessage(msg);
-            }
             
             appendMessage(msg);
         });
@@ -719,7 +718,7 @@ if (messageInput) {
     messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
 }
 
-// --- LOGIKA MINI GAME TIC-TAC-TOE DENGAN ACC, USERNAME PEMENANG, & AUTO-CLOSE POPUP ---
+// --- LOGIKA MINI GAME TIC-TAC-TOE ---
 if (btnInviteGame) {
     btnInviteGame.addEventListener('click', async () => {
         await supabaseClient.from('messages').insert([{
@@ -771,7 +770,6 @@ function initGameSession(config) {
     gameState = ['', '', '', '', '', '', '', '', ''];
     activeGameSymbolsMap = config.symbols;
     
-    // Tentukan simbol saya berdasarkan ID
     mySymbol = config.symbols[currentUserId];
     opponentSymbol = mySymbol === 'X' ? 'O' : 'X';
     isMyTurn = (config.turn === mySymbol);
@@ -827,7 +825,6 @@ function checkGameWinnerLocal() {
             gameActive = false;
             gameStatusText.textContent = `🎉 Permainan Selesai! Pemenang: @${currentUsername}`;
             
-            // Auto close pop-up setelah 3 detik kemenangan
             setTimeout(() => {
                 if (gameModal.classList.contains('active')) {
                     gameModal.classList.remove('active');
@@ -842,7 +839,6 @@ function checkGameWinnerLocal() {
         gameActive = false;
         gameStatusText.textContent = `🤝 Permainan Berakhir Seri!`;
         
-        // Auto close pop-up setelah 3 detik seri
         setTimeout(() => {
             if (gameModal.classList.contains('active')) {
                 gameModal.classList.remove('active');
@@ -870,14 +866,12 @@ function handleIncomingGameMessage(msg) {
                 if (moveData.winner === 'tie') {
                     gameStatusText.textContent = `🤝 Permainan Berakhir Seri!`;
                 } else {
-                    // Cari tahu siapa pemilik simbol pemenang
                     let winnerName = 'Lawan';
                     if (moveData.winnerId && moveData.winnerId === currentUserId) {
                         winnerName = `@${currentUsername}`;
                     } else if (moveData.winnerId && moveData.winnerId === activeFriendId) {
                         winnerName = `@${activeFriendName}`;
                     } else {
-                        // Fallback mapping
                         const winnerSymbol = moveData.winner;
                         const winnerId = Object.keys(activeGameSymbolsMap).find(id => activeGameSymbolsMap[id] === winnerSymbol);
                         winnerName = (winnerId === currentUserId) ? `@${currentUsername}` : `@${activeFriendName}`;
@@ -885,7 +879,6 @@ function handleIncomingGameMessage(msg) {
                     gameStatusText.textContent = `🎉 Permainan Selesai! Pemenang: ${winnerName}`;
                 }
 
-                // Auto close pop-up setelah 3 detik di perangkat lawan
                 setTimeout(() => {
                     if (gameModal.classList.contains('active')) {
                         gameModal.classList.remove('active');
