@@ -78,6 +78,13 @@ const optCancel = document.getElementById('opt-cancel');
 let messageCache = {};
 
 window.addEventListener('DOMContentLoaded', async () => {
+    // Sembunyikan semua layar di awal agar tidak ada flicker/kedipan login
+    loginScreen.classList.remove('active');
+    registerScreen.classList.remove('active');
+    homeScreen.classList.remove('active');
+    profileScreen.classList.remove('active');
+    chatScreen.classList.remove('active');
+
     history.replaceState({ screen: 'home' }, '');
 
     if (currentUserId && currentUsername) {
@@ -88,7 +95,10 @@ window.addEventListener('DOMContentLoaded', async () => {
             showHomeScreen(false);
         } else {
             clearLocalStorage();
+            loginScreen.classList.add('active');
         }
+    } else {
+        loginScreen.classList.add('active');
     }
 });
 
@@ -381,7 +391,7 @@ async function loadFriends() {
     }
 }
 
-// BUKA RUANG CHAT (Langsung tampil tanpa jeda/kedip pembersihan awal)
+// BUKA RUANG CHAT
 async function openChatRoom(friendId, friendName, friendAvatar) {
     if (homeSubscription) supabaseClient.removeChannel(homeSubscription);
 
@@ -390,7 +400,6 @@ async function openChatRoom(friendId, friendName, friendAvatar) {
     activeFriendAvatar = friendAvatar;
     cancelReply();
 
-    // Langsung set tampilan aktif sebelum kueri database selesai
     chatMessages.innerHTML = '';
     messageCache = {};
     chatPartnerName.textContent = `@${friendName}`;
@@ -401,7 +410,6 @@ async function openChatRoom(friendId, friendName, friendAvatar) {
     homeScreen.classList.remove('active');
     chatScreen.classList.add('active');
 
-    // Ambil data status dan pesan di latar belakang secara paralel
     await Promise.all([
         checkPartnerIdStatus(friendId),
         loadMessages()
