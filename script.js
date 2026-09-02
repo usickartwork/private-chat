@@ -76,15 +76,30 @@ const optCancel = document.getElementById('opt-cancel');
 let messageCache = {};
 
 window.addEventListener('DOMContentLoaded', async () => {
+    history.replaceState({ screen: 'home' }, '');
+
     if (currentUserId && currentUsername) {
         const { data } = await supabaseClient.from('profiles').select('*').eq('id', currentUserId).single();
         if (data) {
             currentUserAvatar = data.avatar_url;
             saveLocalStorage();
-            showHomeScreen();
+            showHomeScreen(false);
         } else {
             clearLocalStorage();
         }
+    }
+});
+
+// PENGATURAN TOMBOL BACK / GESTURE DEVICE TANPA KEDIP
+window.addEventListener('popstate', (event) => {
+    messageOptionsModal.classList.remove('active');
+
+    if (chatScreen.classList.contains('active')) {
+        closeChatRoomInternal(false);
+    } else if (profileScreen.classList.contains('active')) {
+        profileScreen.classList.remove('active');
+        homeScreen.classList.add('active');
+        loadFriends();
     }
 });
 
@@ -127,10 +142,10 @@ btnLogin.addEventListener('click', async () => {
     currentUsername = user.username;
     currentUserAvatar = user.avatar_url;
     saveLocalStorage();
-    showHomeScreen();
+    showHomeScreen(true);
 });
 
-function showHomeScreen() {
+function showHomeScreen(pushHistory = true) {
     loginScreen.classList.remove('active');
     registerScreen.classList.remove('active');
     profileScreen.classList.remove('active');
@@ -138,8 +153,11 @@ function showHomeScreen() {
     homeScreen.classList.add('active');
     myProfileName.textContent = `@${currentUsername}`;
     renderAvatar(myHeaderAvatar, currentUserAvatar, currentUsername);
-    loadFriends(true);
+    loadFriends();
     subscribeHomeRealtime();
+    if (pushHistory) {
+        history.replaceState({ screen: 'home' }, '');
+    }
 }
 
 // BUKA HALAMAN PROFIL
@@ -148,12 +166,11 @@ btnOpenProfile.addEventListener('click', () => {
     profileScreen.classList.add('active');
     renderProfileAvatar();
     profileStatus.textContent = '';
+    history.pushState({ screen: 'profile' }, '');
 });
 
 btnBackProfile.addEventListener('click', () => {
-    profileScreen.classList.remove('active');
-    homeScreen.classList.add('active');
-    loadFriends(false);
+    history.back();
 });
 
 function renderProfileAvatar() {
@@ -219,6 +236,7 @@ avatarFileInput.addEventListener('change', async (e) => {
 });
 
 function renderAvatar(containerEl, avatarUrl, username, size = '36px') {
+    if (!containerEl) return;
     containerEl.style.width = size;
     containerEl.style.height = size;
     containerEl.innerHTML = '';
@@ -243,26 +261,45 @@ btnAddFriend.addEventListener('click', async () => {
     const { data: targetUser, error: searchError } = await supabaseClient.from('profiles').select('*').eq('username', targetUsername).single();
     if (searchError || !targetUser) { homeError.textContent = 'Username tidak ditemukan!'; return; }
 
+    const { data: existingFriend } = await supabaseClient
+        .from('friendships')
+        .select('*')
+        .eq('user_id', currentUserId)
+        .eq('friend_id', targetUser.id)
+        .single();
+
+    if (existingFriend) {
+        homeError.textContent = 'Teman sudah ada di daftar kontak!';
+        return;
+    }
+
     await supabaseClient.from('friendships').insert([
         { user_id: currentUserId, friend_id: targetUser.id },
         { user_id: targetUser.id, friend_id: currentUserId }
     ]);
     friendUsernameInput.value = '';
-    loadFriends(true);
+    loadFriends();
 });
 
-// MUAT DAFTAR TEMAN
-async function loadFriends(isInitial = false) {
+// MUAT DAFTAR TEMAN (In-place update tanpa kedip)
+async function loadFriends() {
+    if (!currentUserId) return;
+
     const { data: friendships } = await supabaseClient.from('friendships').select('friend_id').eq('user_id', currentUserId);
     if (!friendships || friendships.length === 0) {
-        if (isInitial) friendsList.innerHTML = '<p style="padding: 20px; text-align: center; color: #888; font-size: 13px;">Belum ada teman.</p>';
+        if (!friendsList.hasChildNodes() || friendsList.innerHTML.includes('Belum ada')) {
+            friendsList.innerHTML = '<p style="padding: 20px; text-align: center; color: #888; font-size: 13px;">Belum ada teman.</p>';
+        }
         return;
     }
 
     const friendIds = friendships.map(f => f.friend_id);
     const { data: friendsProfiles } = await supabaseClient.from('profiles').select('*').in('id', friendIds);
     if (!friendsProfiles) return;
-    if (isInitial) friendsList.innerHTML = '';
+
+    if (friendsList.innerHTML.includes('Belum ada')) {
+        friendsList.innerHTML = '';
+    }
 
     for (const friend of friendsProfiles) {
         const { data: lastMsgs } = await supabaseClient
@@ -348,6 +385,7 @@ async function openChatRoom(friendId, friendName, friendAvatar) {
     activeFriendAvatar = friendAvatar;
     cancelReply();
 
+    history.pushState({ screen: 'chat' }, '');
     homeScreen.classList.remove('active');
     chatScreen.classList.add('active');
     chatPartnerName.textContent = `@${friendName}`;
@@ -356,6 +394,21 @@ async function openChatRoom(friendId, friendName, friendAvatar) {
     await loadMessages();
     await markMessagesAsRead();
     subscribeToRealtime();
+}
+
+// TOMBOL KEMBALI
+btnBack.addEventListener('click', () => {
+    history.back();
+});
+
+function closeChatRoomInternal(pushHistory = true) {
+    if (chatSubscription) supabaseClient.removeChannel(chatSubscription);
+    chatScreen.classList.remove('active');
+    homeScreen.classList.add('active');
+    activeFriendId = null;
+    loadFriends();
+    subscribeHomeRealtime();
+    if (pushHistory) history.replaceState({ screen: 'home' }, '');
 }
 
 async function loadMessages() {
@@ -595,7 +648,7 @@ function subscribeHomeRealtime() {
     homeSubscription = supabaseClient
         .channel(`home-${currentUserId}`)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${currentUserId}` }, () => {
-            if (homeScreen.classList.contains('active')) loadFriends(false);
+            if (homeScreen.classList.contains('active')) loadFriends();
         })
         .subscribe();
 }
@@ -607,7 +660,7 @@ document.addEventListener("visibilitychange", async () => {
             await markMessagesAsRead();
             subscribeToRealtime();
         } else if (homeScreen.classList.contains('active')) {
-            loadFriends(false);
+            loadFriends();
             subscribeHomeRealtime();
         }
     }
@@ -627,14 +680,6 @@ function clearLocalStorage() {
     currentUsername = null;
     currentUserAvatar = null;
 }
-
-btnBack.addEventListener('click', () => {
-    if (chatSubscription) supabaseClient.removeChannel(chatSubscription);
-    chatScreen.classList.remove('active');
-    homeScreen.classList.add('active');
-    loadFriends(true);
-    subscribeHomeRealtime();
-});
 
 btnLogout.addEventListener('click', () => {
     clearLocalStorage();
