@@ -361,11 +361,14 @@ function subscribeToRealtime() {
             schema: 'public',
             table: 'messages',
             filter: `room_id=eq.${currentRoomId}`
-        }, payload => {
+        }, async payload => {
             if (payload && payload.new) {
                 appendMessage(payload.new);
+                
+                // Jika pesan baru dikirim oleh partner, karena kita sedang aktif di room, 
+                // langsung update statusnya jadi 'read' detik itu juga tanpa perlu refresh!
                 if (payload.new.sender_id !== sessionId) {
-                    supabaseClient
+                    await supabaseClient
                         .from('messages')
                         .update({ status: 'read' })
                         .eq('id', payload.new.id);
