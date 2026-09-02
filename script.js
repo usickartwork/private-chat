@@ -57,6 +57,15 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
+// Penanganan agar tampilan otomatis menyesuaikan saat keyboard HP muncul/tertutup
+if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => {
+        if (chatScreen.classList.contains('active')) {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+    });
+}
+
 function showError(msg) {
     errorMsg.textContent = msg;
 }
