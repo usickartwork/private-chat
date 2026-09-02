@@ -124,7 +124,7 @@ function showHomeScreen() {
     chatScreen.classList.remove('active');
     homeScreen.classList.add('active');
     myProfileName.textContent = `@${currentUsername}`;
-    loadFriends();
+    loadFriends(true); // Render penuh saat pertama kali masuk
     subscribeHomeRealtime();
 }
 
@@ -160,19 +160,20 @@ btnAddFriend.addEventListener('click', async () => {
         ]);
 
     friendUsernameInput.value = '';
-    loadFriends();
+    loadFriends(true);
 });
 
-// 3. MUAT DAFTAR TEMAN DENGAN PREVIEW PESAN & INDIKATOR
-async function loadFriends() {
-    friendsList.innerHTML = '';
+// 3. MUAT DAFTAR TEMAN (SUPPORT PARTIAL UPDATE AGAR TIDAK KEDIP)
+async function loadFriends(isInitial = false) {
     const { data: friendships, error } = await supabaseClient
         .from('friendships')
         .select('friend_id')
         .eq('user_id', currentUserId);
 
     if (error || !friendships || friendships.length === 0) {
-        friendsList.innerHTML = '<p style="padding: 20px; text-align: center; color: #888; font-size: 13px;">Belum ada teman. Tambahkan username teman di atas!</p>';
+        if (isInitial) {
+            friendsList.innerHTML = '<p style="padding: 20px; text-align: center; color: #888; font-size: 13px;">Belum ada teman. Tambahkan username teman di atas!</p>';
+        }
         return;
     }
 
@@ -183,56 +184,70 @@ async function loadFriends() {
         .select('*')
         .in('id', friendIds);
 
-    if (friendsProfiles) {
-        for (const friend of friendsProfiles) {
-            // Ambil pesan terakhir antara user dan teman ini
-            const { data: lastMsgs } = await supabaseClient
-                .from('messages')
-                .select('*')
-                .or(`and(sender_id.eq.${currentUserId},receiver_id.eq.${friend.id}),and(sender_id.eq.${friend.id},receiver_id.eq.${currentUserId})`)
-                .order('created_at', { ascending: false })
-                .limit(1);
+    if (!friendsProfiles) return;
 
-            // Hitung pesan belum dibaca dari teman ini
-            const { count: unreadCount } = await supabaseClient
-                .from('messages')
-                .select('*', { count: 'exact', head: true })
-                .eq('sender_id', friend.id)
-                .eq('receiver_id', currentUserId)
-                .eq('status', 'sent');
+    if (isInitial) {
+        friendsList.innerHTML = '';
+    }
 
-            let lastMsgText = 'Belum ada percakapan';
-            let timeStr = '';
-            let isUnread = unreadCount > 0;
+    for (const friend of friendsProfiles) {
+        const { data: lastMsgs } = await supabaseClient
+            .from('messages')
+            .select('*')
+            .or(`and(sender_id.eq.${currentUserId},receiver_id.eq.${friend.id}),and(sender_id.eq.${friend.id},receiver_id.eq.${currentUserId})`)
+            .order('created_at', { ascending: false })
+            .limit(1);
 
-            if (lastMsgs && lastMsgs.length > 0) {
-                const msg = lastMsgs[0];
-                const prefix = msg.sender_id === currentUserId ? 'Kamu: ' : '';
-                lastMsgText = prefix + msg.message;
-                const msgDate = new Date(msg.created_at);
-                const today = new Date();
-                if (msgDate.toDateString() === today.toDateString()) {
-                    timeStr = msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                } else {
-                    timeStr = msgDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
-                }
+        const { count: unreadCount } = await supabaseClient
+            .from('messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('sender_id', friend.id)
+            .eq('receiver_id', currentUserId)
+            .eq('status', 'sent');
+
+        let lastMsgText = 'Belum ada percakapan';
+        let timeStr = '';
+        let isUnread = unreadCount > 0;
+
+        if (lastMsgs && lastMsgs.length > 0) {
+            const msg = lastMsgs[0];
+            const prefix = msg.sender_id === currentUserId ? 'Kamu: ' : '';
+            lastMsgText = prefix + msg.message;
+            const msgDate = new Date(msg.created_at);
+            const today = new Date();
+            if (msgDate.toDateString() === today.toDateString()) {
+                timeStr = msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            } else {
+                timeStr = msgDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
             }
+        }
 
-            const div = document.createElement('div');
-            div.className = `friend-item ${isUnread ? 'unread' : ''}`;
-            div.innerHTML = `
-                <div class="friend-avatar">${friend.username.charAt(0).toUpperCase()}</div>
-                <div class="friend-info">
-                    <div class="friend-top-row">
-                        <span class="friend-name">@${friend.username}</span>
-                        <span class="friend-time">${timeStr}</span>
-                    </div>
-                    <div class="friend-bottom-row">
-                        <span class="friend-last-msg">${escapeHtml(lastMsgText)}</span>
-                        ${isUnread ? `<span class="unread-badge">${unreadCount}</span>` : ''}
-                    </div>
+        let friendEl = document.getElementById(`friend-${friend.id}`);
+        
+        const contentHTML = `
+            <div class="friend-avatar">${friend.username.charAt(0).toUpperCase()}</div>
+            <div class="friend-info">
+                <div class="friend-top-row">
+                    <span class="friend-name">@${friend.username}</span>
+                    <span class="friend-time">${timeStr}</span>
                 </div>
-            `;
+                <div class="friend-bottom-row">
+                    <span class="friend-last-msg">${escapeHtml(lastMsgText)}</span>
+                    ${isUnread ? `<span class="unread-badge">${unreadCount}</span>` : ''}
+                </div>
+            </div>
+        `;
+
+        if (friendEl) {
+            // Update elemen yang ada tanpa merender ulang kontainer utama (mencegah kedip)
+            friendEl.className = `friend-item ${isUnread ? 'unread' : ''}`;
+            friendEl.innerHTML = contentHTML;
+        } else {
+            // Buat elemen baru jika belum ada
+            const div = document.createElement('div');
+            div.id = `friend-${friend.id}`;
+            div.className = `friend-item ${isUnread ? 'unread' : ''}`;
+            div.innerHTML = contentHTML;
             div.addEventListener('click', () => openChatRoom(friend.id, friend.username));
             friendsList.appendChild(div);
         }
@@ -402,7 +417,7 @@ function subscribeToRealtime() {
         .subscribe();
 }
 
-// 6. REALTIME LISTENER DI HALAMAN HOME (UNTUK UPDATE PREVIEW KONTAK SECARA LIVE)
+// 6. REALTIME LISTENER DI HALAMAN HOME (TANPA KEDIP)
 function subscribeHomeRealtime() {
     if (homeSubscription) {
         supabaseClient.removeChannel(homeSubscription);
@@ -417,13 +432,12 @@ function subscribeHomeRealtime() {
             filter: `receiver_id=eq.${currentUserId}`
         }, () => {
             if (homeScreen.classList.contains('active')) {
-                loadFriends();
+                loadFriends(false); // Update parsial tanpa menghapus list
             }
         })
         .subscribe();
 }
 
-// Otomatis sinkronisasi ulang saat PWA kembali dibuka / aktif di layar
 document.addEventListener("visibilitychange", async () => {
     if (document.visibilityState === "visible") {
         if (chatScreen.classList.contains('active') && activeFriendId) {
@@ -431,7 +445,7 @@ document.addEventListener("visibilitychange", async () => {
             await markMessagesAsRead();
             subscribeToRealtime();
         } else if (homeScreen.classList.contains('active')) {
-            loadFriends();
+            loadFriends(false);
             subscribeHomeRealtime();
         }
     }
@@ -455,7 +469,7 @@ btnBack.addEventListener('click', () => {
     }
     chatScreen.classList.remove('active');
     homeScreen.classList.add('active');
-    loadFriends();
+    loadFriends(true);
     subscribeHomeRealtime();
 });
 
