@@ -85,6 +85,7 @@ let isMyTurn = false;
 let mySymbol = '';
 let opponentSymbol = '';
 let gameActive = false;
+let activeGameSymbolsMap = {}; // Menyimpan pemetaan symbol X/O ke userId masing-sekarang
 
 let messageCache = {};
 
@@ -718,7 +719,7 @@ if (messageInput) {
     messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
 }
 
-// --- LOGIKA MINI GAME TIC-TAC-TOE DENGAN NAMA USERNAME & AUTO CLOSE ---
+// --- LOGIKA MINI GAME TIC-TAC-TOE DENGAN ACC, USERNAME PEMENANG, & AUTO-CLOSE POPUP ---
 if (btnInviteGame) {
     btnInviteGame.addEventListener('click', async () => {
         await supabaseClient.from('messages').insert([{
@@ -749,6 +750,10 @@ async function acceptGameInvite(inviteMsgId) {
             [activeFriendId]: hostSymbol,
             [currentUserId]: guestSymbol
         },
+        usernames: {
+            [activeFriendId]: activeFriendName,
+            [currentUserId]: currentUsername
+        },
         turn: 'X'
     };
 
@@ -764,6 +769,9 @@ async function acceptGameInvite(inviteMsgId) {
 
 function initGameSession(config) {
     gameState = ['', '', '', '', '', '', '', '', ''];
+    activeGameSymbolsMap = config.symbols;
+    
+    // Tentukan simbol saya berdasarkan ID
     mySymbol = config.symbols[currentUserId];
     opponentSymbol = mySymbol === 'X' ? 'O' : 'X';
     isMyTurn = (config.turn === mySymbol);
@@ -793,12 +801,12 @@ gameCells.forEach(cell => {
         isMyTurn = false;
         updateBoardUI();
         
-        const hasWon = checkGameWinnerLocal();
+        const winResult = checkGameWinnerLocal();
 
         await supabaseClient.from('messages').insert([{
             sender_id: currentUserId,
             receiver_id: activeFriendId,
-            message: `[GAME_MOVE]:${JSON.stringify({ index, symbol: mySymbol, state: gameState, winner: hasWon })}`,
+            message: `[GAME_MOVE]:${JSON.stringify({ index, symbol: mySymbol, state: gameState, winner: winResult, winnerId: winResult ? currentUserId : null })}`,
             status: 'sent'
         }]);
     });
@@ -816,25 +824,30 @@ function checkGameWinnerLocal() {
         let b = gameState[condition[1]];
         let c = gameState[condition[2]];
         if (a !== '' && a === b && b === c) {
-            let winnerName = (a === mySymbol) ? `@${currentUsername}` : `@${activeFriendName}`;
-            gameStatusText.textContent = `🎉 Permainan Selesai! Pemenang: ${winnerName} (${a})`;
             gameActive = false;
+            gameStatusText.textContent = `🎉 Permainan Selesai! Pemenang: @${currentUsername}`;
             
+            // Auto close pop-up setelah 3 detik kemenangan
             setTimeout(() => {
-                if (gameModal) gameModal.classList.remove('active');
-            }, 3500);
+                if (gameModal.classList.contains('active')) {
+                    gameModal.classList.remove('active');
+                }
+            }, 3000);
 
             return a;
         }
     }
 
     if (!gameState.includes('')) {
-        gameStatusText.textContent = `🤝 Permainan Berakhir Seri!`;
         gameActive = false;
+        gameStatusText.textContent = `🤝 Permainan Berakhir Seri!`;
         
+        // Auto close pop-up setelah 3 detik seri
         setTimeout(() => {
-            if (gameModal) gameModal.classList.remove('active');
-        }, 3500);
+            if (gameModal.classList.contains('active')) {
+                gameModal.classList.remove('active');
+            }
+        }, 3000);
 
         return 'tie';
     }
@@ -857,13 +870,28 @@ function handleIncomingGameMessage(msg) {
                 if (moveData.winner === 'tie') {
                     gameStatusText.textContent = `🤝 Permainan Berakhir Seri!`;
                 } else {
-                    let winnerName = (moveData.winner === mySymbol) ? `@${currentUsername}` : `@${activeFriendName}`;
-                    gameStatusText.textContent = `🎉 Permainan Selesai! Pemenang: ${winnerName} (${moveData.winner})`;
+                    // Cari tahu siapa pemilik simbol pemenang
+                    let winnerName = 'Lawan';
+                    if (moveData.winnerId && moveData.winnerId === currentUserId) {
+                        winnerName = `@${currentUsername}`;
+                    } else if (moveData.winnerId && moveData.winnerId === activeFriendId) {
+                        winnerName = `@${activeFriendName}`;
+                    } else {
+                        // Fallback mapping
+                        const winnerSymbol = moveData.winner;
+                        const winnerId = Object.keys(activeGameSymbolsMap).find(id => activeGameSymbolsMap[id] === winnerSymbol);
+                        winnerName = (winnerId === currentUserId) ? `@${currentUsername}` : `@${activeFriendName}`;
+                    }
+                    gameStatusText.textContent = `🎉 Permainan Selesai! Pemenang: ${winnerName}`;
                 }
 
+                // Auto close pop-up setelah 3 detik di perangkat lawan
                 setTimeout(() => {
-                    if (gameModal) gameModal.classList.remove('active');
-                }, 3500);
+                    if (gameModal.classList.contains('active')) {
+                        gameModal.classList.remove('active');
+                    }
+                }, 3000);
+
             } else {
                 if (moveData.symbol !== mySymbol) {
                     isMyTurn = true;
