@@ -24,7 +24,7 @@ const loginScreen = document.getElementById('login-screen');
 const registerScreen = document.getElementById('register-screen');
 const homeScreen = document.getElementById('home-screen');
 const profileScreen = document.getElementById('profile-screen');
-const chatScreen = modelGetElement('chat-screen');
+const chatScreen = document.getElementById('chat-screen');
 
 const loginUsernameInput = document.getElementById('login-username');
 const loginPasswordInput = document.getElementById('login-password');
@@ -50,6 +50,7 @@ const profileLargeImg = document.getElementById('profile-large-img');
 const btnChangePhoto = document.getElementById('btn-change-photo');
 const avatarFileInput = document.getElementById('avatar-file-input');
 const profileStatus = document.getElementById('profile-status');
+const profileDisplayUsername = document.getElementById('profile-display-username');
 
 const friendUsernameInput = document.getElementById('friend-username-input');
 const btnAddFriend = document.getElementById('btn-add-friend');
@@ -74,10 +75,6 @@ const optReply = document.getElementById('opt-reply');
 const optDeleteMe = document.getElementById('opt-delete-me');
 const optDeleteAll = document.getElementById('opt-delete-all');
 const optCancel = document.getElementById('opt-cancel');
-
-function modelGetElement(id) {
-    return document.getElementById(id);
-}
 
 let messageCache = {};
 
@@ -184,6 +181,7 @@ if (btnOpenProfile) {
         homeScreen.classList.remove('active');
         profileScreen.classList.add('active');
         renderProfileAvatar();
+        if (profileDisplayUsername) profileDisplayUsername.textContent = `@${currentUsername}`;
         profileStatus.textContent = '';
         history.pushState({ screen: 'profile' }, '');
     });
@@ -305,6 +303,8 @@ if (btnAddFriend) {
             { user_id: targetUser.id, friend_id: currentUserId }
         ]);
         friendUsernameInput.value = '';
+        homeError.style.color = '#28a745';
+        homeError.textContent = 'Teman berhasil ditambahkan!';
         loadFriends();
     });
 }
