@@ -706,6 +706,7 @@ async function sendMessage() {
 
     const replyId = replyingToMessageId;
     currentInput.value = '';
+    currentInput.style.height = 'auto'; // Reset tinggi textarea setelah kirim
     cancelReply();
 
     if (typingChannel) {
@@ -729,7 +730,7 @@ if (btnSend) {
     btnSend.addEventListener('click', sendMessage);
 }
 
-// --- FITUR TYPING INDICATOR & HANDLING INPUT CHAT ---
+// --- FITUR TYPING INDICATOR & TEXTAREA AUTO-RESIZE ---
 function setupTypingIndicator() {
     if (typingChannel) supabaseClient.removeChannel(typingChannel);
 
@@ -757,20 +758,23 @@ function setupTypingIndicator() {
 
     const activeMsgInput = document.getElementById('message-input');
     if (activeMsgInput) {
-        // Bersihkan event listener sebelumnya dengan clone node
         const newMsgInput = activeMsgInput.cloneNode(true);
         activeMsgInput.parentNode.replaceChild(newMsgInput, activeMsgInput);
         
         const freshInput = document.getElementById('message-input');
         
-        freshInput.addEventListener('keypress', (e) => { 
-            if (e.key === 'Enter') {
+        freshInput.addEventListener('keydown', (e) => { 
+            if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 sendMessage();
             }
         });
 
-        freshInput.addEventListener('input', () => {
+        freshInput.addEventListener('input', function() {
+            // Auto-resize tinggi textarea
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+
             if (!typingChannel) return;
 
             typingChannel.send({
