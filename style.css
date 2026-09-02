@@ -35,7 +35,6 @@ body {
     flex-direction: column;
     justify-content: center;
     height: 100%;
-    overflow-y: auto;
 }
 
 h2 {
@@ -77,25 +76,6 @@ input[type="text"]:focus {
     border-color: #007bff;
 }
 
-.divider {
-    display: flex;
-    align-items: center;
-    text-align: center;
-    margin: 20px 0;
-    color: #aaa;
-    font-size: 12px;
-}
-
-.divider::before, .divider::after {
-    content: '';
-    flex: 1;
-    border-bottom: 1px solid #eee;
-}
-
-.divider span {
-    padding: 0 10px;
-}
-
 .btn {
     width: 100%;
     padding: 12px;
@@ -116,20 +96,118 @@ input[type="text"]:focus {
     background-color: #0056b3;
 }
 
-.btn.secondary {
-    background-color: #e4e6eb;
-    color: #333;
-}
-
-.btn.secondary:hover {
-    background-color: #d8dadf;
-}
-
-.error {
+.error, .error-small {
     color: #dc3545;
     font-size: 13px;
-    margin-top: 12px;
+    margin-top: 10px;
     text-align: center;
+}
+
+/* Home / Contact Screen */
+.home-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px;
+    background: #ffffff;
+    border-bottom: 1px solid #eee;
+}
+
+.home-header h3 {
+    font-size: 16px;
+    color: #1a1a1a;
+}
+
+.home-header span {
+    font-size: 12px;
+    color: #28a745;
+}
+
+.btn-icon-text {
+    background: none;
+    border: none;
+    color: #dc3545;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.add-friend-box {
+    display: flex;
+    padding: 12px 16px;
+    gap: 8px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #eee;
+}
+
+.add-friend-box input {
+    flex: 1;
+    padding: 10px 12px;
+    font-size: 15px;
+}
+
+.add-friend-box button {
+    width: auto;
+    padding: 0 16px;
+    border-radius: 8px;
+}
+
+.section-title {
+    font-size: 12px;
+    font-weight: bold;
+    color: #666;
+    padding: 12px 16px 4px 16px;
+    background: #f0f2f5;
+    text-transform: uppercase;
+}
+
+.friends-list {
+    flex: 1;
+    overflow-y: auto;
+    background: #ffffff;
+}
+
+.friend-item {
+    display: flex;
+    align-items: center;
+    padding: 14px 16px;
+    border-bottom: 1px solid #f0f2f5;
+    cursor: pointer;
+    transition: background 0.1s;
+}
+
+.friend-item:hover {
+    background: #f8f9fa;
+}
+
+.friend-avatar {
+    width: 40px;
+    height: 40px;
+    background: #007bff;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 16px;
+    margin-right: 12px;
+}
+
+.friend-info {
+    flex: 1;
+}
+
+.friend-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: #1a1a1a;
+}
+
+.friend-last-msg {
+    font-size: 13px;
+    color: #666;
+    margin-top: 2px;
 }
 
 /* Chat Screen Styles */
@@ -159,7 +237,7 @@ input[type="text"]:focus {
 
 .chat-info span {
     font-size: 12px;
-    color: #666;
+    color: #28a745;
 }
 
 .chat-messages {
@@ -173,7 +251,6 @@ input[type="text"]:focus {
     -webkit-overflow-scrolling: touch;
 }
 
-/* Animasi Pesan Masuk */
 @keyframes messageAppear {
     from {
         opacity: 0;
@@ -207,27 +284,32 @@ input[type="text"]:focus {
     align-self: flex-end;
 }
 
-.msg-sender {
-    font-size: 11px;
-    font-weight: bold;
-    color: #007bff;
-    margin-bottom: 2px;
-}
-
-.message-item.outgoing .msg-sender {
-    color: #2e7d32;
-}
-
 .msg-text {
     font-size: 14px;
     color: #111;
 }
 
+.msg-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    margin-top: 4px;
+}
+
 .msg-time {
     font-size: 10px;
     color: #888;
-    align-self: flex-end;
-    margin-top: 4px;
+}
+
+.msg-status {
+    font-size: 11px;
+    font-weight: bold;
+    color: #888;
+}
+
+.msg-status.read {
+    color: #027eb5;
 }
 
 .chat-input-area {
@@ -260,31 +342,4 @@ input[type="text"]:focus {
 
 .btn-send:hover {
     background: #0056b3;
-}
-
-.msg-footer {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 4px;
-    margin-top: 4px;
-}
-
-.msg-time {
-    font-size: 10px;
-    color: #888;
-}
-
-.message-item.outgoing .msg-time {
-    color: #555;
-}
-
-.msg-status {
-    font-size: 11px;
-    font-weight: bold;
-    color: #888; /* Warna abu-abu untuk terkirim (sent) */
-}
-
-.msg-status.read {
-    color: #027eb5; /* Warna biru untuk terbaca (read) */
 }

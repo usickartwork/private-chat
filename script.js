@@ -6,10 +6,10 @@ const { createClient } = supabase;
 const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // State Aplikasi
-let currentRoomId = localStorage.getItem('chat_room_id') || null;
-let currentRoomCode = localStorage.getItem('chat_room_code') || null;
-let currentParticipantId = null;
-let currentUserName = localStorage.getItem('chat_user_name') || '';
+let currentUserId = localStorage.getItem('chat_user_id') || null;
+let currentUsername = localStorage.getItem('chat_username') || null;
+let activeFriendId = null;
+let activeFriendName = null;
 let sessionId = localStorage.getItem('chat_session_id');
 
 if (!sessionId) {
@@ -17,223 +17,194 @@ if (!sessionId) {
     localStorage.setItem('chat_session_id', sessionId);
 }
 
-let messageSubscription = null;
+let chatSubscription = null;
 
 // DOM Elements
+const setupScreen = document.getElementById('setup-screen');
 const homeScreen = document.getElementById('home-screen');
 const chatScreen = document.getElementById('chat-screen');
-const usernameInput = document.getElementById('username');
-const roomCodeInput = document.getElementById('room-code-input');
-const btnCreate = document.getElementById('btn-create');
-const btnJoin = document.getElementById('btn-join');
-const errorMsg = document.getElementById('error-msg');
+
+const createUsernameInput = document.getElementById('create-username');
+const btnSaveUsername = document.getElementById('btn-save-username');
+const setupError = document.getElementById('setup-error');
+
+const myProfileName = document.getElementById('my-profile-name');
+const btnLogout = document.getElementById('btn-logout');
+const friendUsernameInput = document.getElementById('friend-username-input');
+const btnAddFriend = document.getElementById('btn-add-friend');
+const homeError = document.getElementById('home-error');
+const friendsList = document.getElementById('friends-list');
+
+const chatPartnerName = document.getElementById('chat-partner-name');
+const btnBack = document.getElementById('btn-back');
 const chatMessages = document.getElementById('chat-messages');
 const messageInput = document.getElementById('message-input');
 const btnSend = document.getElementById('btn-send');
-const btnBack = document.getElementById('btn-back');
-const roomTitle = document.getElementById('room-title');
-const roomCodeDisplay = document.getElementById('room-code-display');
 
-if (currentUserName) {
-    usernameInput.value = currentUserName;
-}
-
-// AUTO-RECONNECT
+// AUTO-LOGIN CHECK
 window.addEventListener('DOMContentLoaded', async () => {
-    if (currentRoomId && currentUserName) {
-        const { data: partData } = await supabaseClient
-            .from('participants')
+    if (currentUserId && currentUsername) {
+        // Validasi apakah user masih terdaftar di database
+        const { data } = await supabaseClient
+            .from('profiles')
             .select('*')
-            .eq('room_id', currentRoomId)
-            .eq('session_id', sessionId)
+            .eq('id', currentUserId)
             .single();
 
-        if (partData) {
-            currentParticipantId = partData.id;
-            enterChatRoom();
+        if (data) {
+            showHomeScreen();
         } else {
-            clearSessionStorage();
+            clearLocalStorage();
         }
     }
 });
 
-// Penanganan viewport mobile
-if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', () => {
-        if (chatScreen.classList.contains('active')) {
-            chatMessages.scrollTop = chatMessages.scrollHeight;
+// 1. BUAT / MASUK DENGAN USERNAME
+btnSaveUsername.addEventListener('click', async () => {
+    const uname = createUsernameInput.value.trim().toLowerCase();
+    if (!uname) {
+        setupError.textContent = 'Masukkan username terlebih dahulu!';
+        return;
+    }
+    setupError.textContent = '';
+
+    // Cek apakah username sudah ada
+    const { data: existing } = await supabaseClient
+        .from('profiles')
+        .select('*')
+        .eq('username', uname)
+        .single();
+
+    if (existing) {
+        // Jika session_id sama atau perangkat sama, langsung masuk
+        if (existing.session_id === sessionId) {
+            currentUserId = existing.id;
+            currentUsername = existing.username;
+            saveLocalStorage();
+            showHomeScreen();
+        } else {
+            setupError.textContent = 'Username sudah digunakan orang lain. Pilih yang lain!';
         }
-    });
-}
-
-messageInput.addEventListener('blur', () => {
-    setTimeout(() => {
-        window.scrollTo(0, 0);
-        document.body.scrollTop = 0;
-    }, 100);
-});
-
-function showError(msg) {
-    errorMsg.textContent = msg;
-}
-
-function generateRoomCode() {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let code = '';
-    for (let i = 0; i < 6; i++) {
-        code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return code;
-}
-
-// 1. BUAT ROOM BARU
-btnCreate.addEventListener('click', async () => {
-    const name = usernameInput.value.trim();
-    if (!name) {
-        showError('Silakan masukkan nama kamu terlebih dahulu!');
         return;
     }
-    showError('');
-    currentUserName = name;
-    localStorage.setItem('chat_user_name', currentUserName);
 
-    const roomCode = generateRoomCode();
-
-    const { data: roomData, error: roomError } = await supabaseClient
-        .from('rooms')
-        .insert([{ room_code: roomCode }])
+    // Buat profil baru
+    const { data: newProfile, error } = await supabaseClient
+        .from('profiles')
+        .insert([{ username: uname, session_id: sessionId }])
         .select()
         .single();
 
-    if (roomError) {
-        showError('Gagal membuat room. Coba lagi.');
+    if (error) {
+        setupError.textContent = 'Gagal membuat akun. Coba lagi.';
         return;
     }
 
-    currentRoomId = roomData.id;
-    currentRoomCode = roomData.room_code;
-    localStorage.setItem('chat_room_id', currentRoomId);
-    localStorage.setItem('chat_room_code', currentRoomCode);
-
-    const { data: partData, error: partError } = await supabaseClient
-        .from('participants')
-        .insert([{
-            room_id: currentRoomId,
-            session_id: sessionId,
-            name: currentUserName
-        }])
-        .select()
-        .single();
-
-    if (partError) {
-        showError('Gagal bergabung ke room.');
-        return;
-    }
-
-    currentParticipantId = partData.id;
-    enterChatRoom();
+    currentUserId = newProfile.id;
+    currentUsername = newProfile.username;
+    saveLocalStorage();
+    showHomeScreen();
 });
 
-// 2. GABUNG CHAT DENGAN KODE
-btnJoin.addEventListener('click', async () => {
-    const name = usernameInput.value.trim();
-    const code = roomCodeInput.value.trim().toUpperCase();
+function showHomeScreen() {
+    setupScreen.classList.remove('active');
+    chatScreen.classList.remove('active');
+    homeScreen.classList.add('active');
+    myProfileName.textContent = `@${currentUsername}`;
+    loadFriends();
+}
 
-    if (!name) {
-        showError('Silakan masukkan nama kamu terlebih dahulu!');
+// 2. TAMBAH TEMAN BERDASARKAN USERNAME
+btnAddFriend.addEventListener('click', async () => {
+    const targetUsername = friendUsernameInput.value.trim().toLowerCase();
+    if (!targetUsername) {
+        homeError.textContent = 'Masukkan username teman!';
         return;
     }
-    if (!code) {
-        showError('Silakan masukkan kode room!');
+    if (targetUsername === currentUsername) {
+        homeError.textContent = 'Tidak bisa menambahkan diri sendiri!';
         return;
     }
-    showError('');
-    currentUserName = name;
-    localStorage.setItem('chat_user_name', currentUserName);
+    homeError.textContent = '';
 
-    const { data: roomData, error: roomError } = await supabaseClient
-        .from('rooms')
+    // Cari user target
+    const { data: targetUser, error: searchError } = await supabaseClient
+        .from('profiles')
         .select('*')
-        .eq('room_code', code)
+        .eq('username', targetUsername)
         .single();
 
-    if (roomError || !roomData) {
-        showError('Room dengan kode tersebut tidak ditemukan!');
+    if (searchError || !targetUser) {
+        homeError.textContent = 'Username tidak ditemukan!';
         return;
     }
 
-    currentRoomId = roomData.id;
-    currentRoomCode = roomData.room_code;
-    localStorage.setItem('chat_room_id', currentRoomId);
-    localStorage.setItem('chat_room_code', currentRoomCode);
+    // Tambahkan ke tabel friendships (2 arah biar mudah di-query)
+    const { error: friendError } = await supabaseClient
+        .from('friendships')
+        .insert([
+            { user_id: currentUserId, friend_id: targetUser.id },
+            { user_id: targetUser.id, friend_id: currentUserId }
+        ]);
 
-    const { data: participants, error: countError } = await supabaseClient
-        .from('participants')
-        .select('*')
-        .eq('room_id', currentRoomId);
-
-    if (countError) {
-        showError('Terjadi kesalahan sistem.');
+    if (friendError) {
+        homeError.textContent = 'Teman sudah ada dalam daftar!';
         return;
     }
 
-    const existingUser = participants.find(p => p.session_id === sessionId);
-
-    if (existingUser) {
-        currentParticipantId = existingUser.id;
-        enterChatRoom();
-        return;
-    }
-
-    if (participants.length >= 2) {
-        showError('Maaf, room ini sudah penuh (maksimal 2 orang)!');
-        return;
-    }
-
-    const { data: partData, error: partError } = await supabaseClient
-        .from('participants')
-        .insert([{
-            room_id: currentRoomId,
-            session_id: sessionId,
-            name: currentUserName
-        }])
-        .select()
-        .single();
-
-    if (partError) {
-        showError('Gagal bergabung ke room.');
-        return;
-    }
-
-    currentParticipantId = partData.id;
-    enterChatRoom();
+    friendUsernameInput.value = '';
+    loadFriends();
 });
 
-async function enterChatRoom() {
+// 3. MUAT DAFTAR TEMAN
+async function loadFriends() {
+    friendsList.innerHTML = '';
+    const { data: friendships, error } = await supabaseClient
+        .from('friendships')
+        .select('friend_id')
+        .eq('user_id', currentUserId);
+
+    if (error || !friendships || friendships.length === 0) {
+        friendsList.innerHTML = '<p style="padding: 20px; text-align: center; color: #888; font-size: 13px;">Belum ada teman. Tambahkan username teman di atas!</p>';
+        return;
+    }
+
+    const friendIds = friendships.map(f => f.friend_id);
+
+    const { data: friendsProfiles } = await supabaseClient
+        .from('profiles')
+        .select('*')
+        .in('id', friendIds);
+
+    if (friendsProfiles) {
+        friendsProfiles.forEach(friend => {
+            const div = document.createElement('div');
+            div.className = 'friend-item';
+            div.innerHTML = `
+                <div class="friend-avatar">${friend.username.charAt(0).toUpperCase()}</div>
+                <div class="friend-info">
+                    <div class="friend-name">@${friend.username}</div>
+                    <div class="friend-last-msg">Klik untuk mulai chat</div>
+                </div>
+            `;
+            div.addEventListener('click', () => openChatRoom(friend.id, friend.username));
+            friendsList.appendChild(div);
+        });
+    }
+}
+
+// 4. BUKA RUANG CHAT DENGAN TEMAN
+async function openChatRoom(friendId, friendName) {
+    activeFriendId = friendId;
+    activeFriendName = friendName;
+
     homeScreen.classList.remove('active');
     chatScreen.classList.add('active');
-    roomCodeDisplay.textContent = `Kode: ${currentRoomCode}`;
-    
-    subscribeToRealtime();
-    await loadParticipantsAndHeader();
+    chatPartnerName.textContent = `@${friendName}`;
+
     await loadMessages();
     await markMessagesAsRead();
-}
-
-async function loadParticipantsAndHeader() {
-    const { data: participants } = await supabaseClient
-        .from('participants')
-        .select('*')
-        .eq('room_id', currentRoomId);
-
-    if (participants) {
-        const other = participants.find(p => p.session_id !== sessionId);
-        if (other) {
-            roomTitle.textContent = `${currentUserName} & ${other.name}`;
-        } else {
-            roomTitle.textContent = `${currentUserName} (Menunggu partner...)`;
-        }
-    }
+    subscribeToRealtime();
 }
 
 async function loadMessages() {
@@ -241,7 +212,7 @@ async function loadMessages() {
     const { data: messages, error } = await supabaseClient
         .from('messages')
         .select('*')
-        .eq('room_id', currentRoomId)
+        .or(`and(sender_id.eq.${currentUserId},receiver_id.eq.${activeFriendId}),and(sender_id.eq.${activeFriendId},receiver_id.eq.${currentUserId})`)
         .order('created_at', { ascending: true });
 
     if (!error && messages) {
@@ -250,26 +221,17 @@ async function loadMessages() {
 }
 
 async function markMessagesAsRead() {
-    const { data: unreadMsgs, error } = await supabaseClient
+    await supabaseClient
         .from('messages')
-        .select('id')
-        .eq('room_id', currentRoomId)
-        .neq('sender_id', sessionId)
+        .update({ status: 'read' })
+        .eq('sender_id', activeFriendId)
+        .eq('receiver_id', currentUserId)
         .eq('status', 'sent');
-
-    if (!error && unreadMsgs && unreadMsgs.length > 0) {
-        for (let msg of unreadMsgs) {
-            await supabaseClient
-                .from('messages')
-                .update({ status: 'read' })
-                .eq('id', msg.id);
-        }
-    }
 }
 
 function appendMessage(msg) {
     let msgEl = document.getElementById(`msg-${msg.id}`);
-    const isOutgoing = msg.sender_id === sessionId;
+    const isOutgoing = msg.sender_id === currentUserId;
     const timeStr = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     
     let statusIcon = '';
@@ -298,7 +260,6 @@ function appendMessage(msg) {
     div.className = `message-item ${isOutgoing ? 'outgoing' : 'incoming'}`;
 
     div.innerHTML = `
-        <span class="msg-sender">${escapeHtml(msg.sender_name)}</span>
         <span class="msg-text">${escapeHtml(msg.message)}</span>
         <div class="msg-footer">
             <span class="msg-time">${timeStr}</span>
@@ -311,13 +272,7 @@ function appendMessage(msg) {
 }
 
 function escapeHtml(text) {
-    const map = {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#039;'
-    };
+    const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
     return text.replace(/[&<>"']/g, function(m) { return map[m]; });
 }
 
@@ -330,9 +285,8 @@ async function sendMessage() {
     const { error } = await supabaseClient
         .from('messages')
         .insert([{
-            room_id: currentRoomId,
-            sender_id: sessionId,
-            sender_name: currentUserName,
+            sender_id: currentUserId,
+            receiver_id: activeFriendId,
             message: text,
             status: 'sent'
         }]);
@@ -349,29 +303,33 @@ messageInput.addEventListener('keypress', (e) => {
     }
 });
 
+// 5. REALTIME LISTENER
 function subscribeToRealtime() {
-    if (messageSubscription) {
-        supabaseClient.removeChannel(messageSubscription);
+    if (chatSubscription) {
+        supabaseClient.removeChannel(chatSubscription);
     }
 
-    messageSubscription = supabaseClient
-        .channel(`room-${currentRoomId}`)
+    chatSubscription = supabaseClient
+        .channel(`chat-${currentUserId}`)
         .on('postgres_changes', {
             event: 'INSERT',
             schema: 'public',
-            table: 'messages',
-            filter: `room_id=eq.${currentRoomId}`
+            table: 'messages'
         }, async payload => {
             if (payload && payload.new) {
-                appendMessage(payload.new);
-                
-                // Jika pesan baru dikirim oleh partner, karena kita sedang aktif di room, 
-                // langsung update statusnya jadi 'read' detik itu juga tanpa perlu refresh!
-                if (payload.new.sender_id !== sessionId) {
-                    await supabaseClient
-                        .from('messages')
-                        .update({ status: 'read' })
-                        .eq('id', payload.new.id);
+                const msg = payload.new;
+                // Jika pesan melibatkan user yang sedang aktif chat
+                if (
+                    (msg.sender_id === activeFriendId && msg.receiver_id === currentUserId) ||
+                    (msg.sender_id === currentUserId && msg.receiver_id === activeFriendId)
+                ) {
+                    appendMessage(msg);
+                    if (msg.sender_id === activeFriendId && msg.receiver_id === currentUserId) {
+                        await supabaseClient
+                            .from('messages')
+                            .update({ status: 'read' })
+                            .eq('id', msg.id);
+                    }
                 }
             }
         })
@@ -380,35 +338,41 @@ function subscribeToRealtime() {
             schema: 'public',
             table: 'messages'
         }, payload => {
-            if (payload && payload.new && payload.new.room_id === currentRoomId) {
-                appendMessage(payload.new);
+            if (payload && payload.new) {
+                const msg = payload.new;
+                if (
+                    (msg.sender_id === activeFriendId && msg.receiver_id === currentUserId) ||
+                    (msg.sender_id === currentUserId && msg.receiver_id === activeFriendId)
+                ) {
+                    appendMessage(msg);
+                }
             }
-        })
-        .on('postgres_changes', {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'participants',
-            filter: `room_id=eq.${currentRoomId}`
-        }, () => {
-            loadParticipantsAndHeader();
         })
         .subscribe();
 }
 
-function clearSessionStorage() {
-    localStorage.removeItem('chat_room_id');
-    localStorage.removeItem('chat_room_code');
-    currentRoomId = null;
-    currentRoomCode = null;
+function saveLocalStorage() {
+    localStorage.setItem('chat_user_id', currentUserId);
+    localStorage.setItem('chat_username', currentUsername);
+}
+
+function clearLocalStorage() {
+    localStorage.removeItem('chat_user_id');
+    localStorage.removeItem('chat_username');
+    currentUserId = null;
+    currentUsername = null;
 }
 
 btnBack.addEventListener('click', () => {
-    if (messageSubscription) {
-        supabaseClient.removeChannel(messageSubscription);
+    if (chatSubscription) {
+        supabaseClient.removeChannel(chatSubscription);
     }
-    clearSessionStorage();
     chatScreen.classList.remove('active');
     homeScreen.classList.add('active');
-    roomCodeInput.value = '';
-    errorMsg.textContent = '';
+    loadFriends();
+});
+
+btnLogout.addEventListener('click', () => {
+    clearLocalStorage();
+    location.reload();
 });

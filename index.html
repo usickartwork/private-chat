@@ -3,44 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Private Chat</title>
+    <title>Private Chat - Multi User</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="home-screen" class="screen active">
+    <!-- 1. SCREEN: BUAT USERNAME -->
+    <div id="setup-screen" class="screen active">
         <div class="card">
-            <h2>Private Chat</h2>
-            <p class="subtitle">Aplikasi chat privat instan</p>
+            <h2>Buat Akun</h2>
+            <p class="subtitle">Tentukan username unik kamu untuk mulai chat</p>
             
             <div class="form-group">
-                <label for="username">Nama Kamu</label>
-                <input type="text" id="username" placeholder="Masukkan namamu..." autocomplete="off">
+                <label for="create-username">Username</label>
+                <input type="text" id="create-username" placeholder="Contoh: filius" autocomplete="off">
             </div>
-
-            <div class="divider"><span>ATAU</span></div>
-
-            <div class="action-box">
-                <button id="btn-create" class="btn primary">Buat Chat Baru</button>
-            </div>
-
-            <div class="divider"><span>GABUNG ROOM</span></div>
-
-            <div class="form-group">
-                <label for="room-code-input">Kode Room</label>
-                <input type="text" id="room-code-input" placeholder="Contoh: A9B2C1" maxlength="6" autocomplete="off" style="text-transform: uppercase;">
-            </div>
-            <button id="btn-join" class="btn secondary">Gabung Chat</button>
-
-            <p id="error-msg" class="error"></p>
+            <button id="btn-save-username" class="btn primary">Masuk & Simpan</button>
+            <p id="setup-error" class="error"></p>
         </div>
     </div>
 
+    <!-- 2. SCREEN: DAFTAR TEMAN & CHAT LIST -->
+    <div id="home-screen" class="screen">
+        <div class="home-header">
+            <div>
+                <h3 id="my-profile-name">Halo, -</h3>
+                <span id="my-profile-status">Online</span>
+            </div>
+            <button id="btn-logout" class="btn-icon-text">Keluar</button>
+        </div>
+
+        <div class="add-friend-box">
+            <input type="text" id="friend-username-input" placeholder="Cari username teman..." autocomplete="off">
+            <button id="btn-add-friend" class="btn primary">Tambah</button>
+        </div>
+        <p id="home-error" class="error-small"></p>
+
+        <div class="section-title">Daftar Kontak</div>
+        <div id="friends-list" class="friends-list">
+            <!-- Daftar teman akan dimuat di sini -->
+        </div>
+    </div>
+
+    <!-- 3. SCREEN: RUANG CHAT PRIVAT -->
     <div id="chat-screen" class="screen">
         <div class="chat-header">
             <button id="btn-back" class="btn-icon">←</button>
             <div class="chat-info">
-                <h3 id="room-title">Memuat...</h3>
-                <span id="room-code-display">Kode: ------</span>
+                <h3 id="chat-partner-name">Nama Teman</h3>
+                <span id="chat-status-indicator">Online</span>
             </div>
         </div>
 
