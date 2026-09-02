@@ -5,6 +5,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Private Chat - Profile & Avatar</title>
     <link rel="stylesheet" href="style.css">
+    <style>
+        /* Tambahan styling minimalis ala WhatsApp Profile */
+        .profile-menu-list {
+            width: 100%;
+            margin-top: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 0 16px;
+        }
+        .profile-menu-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 16px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #333;
+            border: none;
+            cursor: pointer;
+            text-align: left;
+            width: 100%;
+        }
+        .profile-menu-item.danger {
+            color: #dc3545;
+            background: #fff5f5;
+        }
+    </style>
 </head>
 <body>
     <!-- 1. SCREEN: LOGIN -->
@@ -60,10 +90,9 @@
                 <div id="my-header-avatar" class="friend-avatar" style="width: 36px; height: 36px; font-size: 14px;">-</div>
                 <div>
                     <h3 id="my-profile-name" style="font-size: 14px;">Halo, -</h3>
-                    <span style="font-size: 11px; color: #0084ff;">Edit Profil & Foto</span>
+                    <span style="font-size: 11px; color: #0084ff;">Profil & Pengaturan</span>
                 </div>
             </div>
-            <button id="btn-logout" class="btn-icon-text">Keluar</button>
         </div>
 
         <div class="add-friend-box">
@@ -76,22 +105,30 @@
         <div id="friends-list" class="friends-list"></div>
     </div>
 
-    <!-- 4. SCREEN: PROFILE SETTINGS -->
+    <!-- 4. SCREEN: PROFILE SETTINGS (Ala WhatsApp Style) -->
     <div id="profile-screen" class="screen">
         <div class="chat-header">
             <button id="btn-back-profile" class="btn-icon">←</button>
             <div class="chat-info">
-                <h3>Pengaturan Profil</h3>
+                <h3>Profil Saya</h3>
             </div>
         </div>
-        <div class="card" style="align-items: center; text-align: center; justify-content: flex-start; padding-top: 40px;">
-            <div id="profile-pic-container" style="position: relative; margin-bottom: 20px; cursor: pointer;">
+        <div class="card" style="align-items: center; text-align: center; justify-content: flex-start; padding-top: 30px;">
+            <div id="profile-pic-container" style="position: relative; margin-bottom: 12px; cursor: pointer;">
                 <div id="profile-large-avatar" class="friend-avatar" style="width: 90px; height: 90px; font-size: 36px;">-</div>
                 <img id="profile-large-img" style="display: none; width: 90px; height: 90px; border-radius: 50%; object-fit: cover;" />
             </div>
             <input type="file" id="avatar-file-input" accept="image/*" style="display: none;">
-            <button id="btn-change-photo" class="btn primary" style="width: auto; padding: 10px 20px; font-size: 14px;">Pilih Foto Profil Baru</button>
-            <p id="profile-status" class="error-small" style="color: #28a745;"></p>
+            <button id="btn-change-photo" class="btn primary" style="width: auto; padding: 8px 16px; font-size: 13px;">Ganti Foto Profil</button>
+            <p id="profile-status" class="error-small" style="color: #28a745; margin-top: 4px;"></p>
+            
+            <!-- Menu Pengaturan di Bawah ala WhatsApp -->
+            <div class="profile-menu-list">
+                <button id="btn-logout" class="profile-menu-item danger">
+                    <span>Keluar (Logout)</span>
+                    <span>→</span>
+                </button>
+            </div>
         </div>
     </div>
 
