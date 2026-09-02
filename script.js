@@ -16,6 +16,8 @@ let selectedMessageForAction = null;
 let chatSubscription = null;
 let homeSubscription = null;
 let profileStatusSubscription = null;
+let typingChannel = null;
+let typingTimeout = null;
 
 const loginScreen = document.getElementById('login-screen');
 const registerScreen = document.getElementById('register-screen');
@@ -442,6 +444,7 @@ async function openChatRoom(friendId, friendName, friendAvatar) {
     subscribePartnerStatus(friendId);
     await markMessagesAsRead();
     subscribeToRealtime();
+    setupTypingIndicator();
 }
 
 async function checkPartnerIdStatus(friendId) {
@@ -465,8 +468,11 @@ function subscribePartnerStatus(friendId) {
         }, payload => {
             if (payload && payload.new) {
                 const isOnline = payload.new.is_online;
-                chatStatusIndicator.textContent = isOnline ? 'Online' : 'Offline';
-                chatStatusIndicator.style.color = isOnline ? '#28a745' : '#888';
+                // Hanya perbarui status jika partner tidak sedang mengetik
+                if (chatStatusIndicator.textContent !== 'Sedang mengetik...') {
+                    chatStatusIndicator.textContent = isOnline ? 'Online' : 'Offline';
+                    chatStatusIndicator.style.color = isOnline ? '#28a745' : '#888';
+                }
             }
         })
         .subscribe();
@@ -481,6 +487,7 @@ if (btnBack) {
 function closeChatRoomInternal(pushHistory = true) {
     if (chatSubscription) supabaseClient.removeChannel(chatSubscription);
     if (profileStatusSubscription) supabaseClient.removeChannel(profileStatusSubscription);
+    if (typingChannel) supabaseClient.removeChannel(typingChannel);
     chatScreen.classList.remove('active');
     homeScreen.classList.add('active');
     activeFriendId = null;
@@ -701,6 +708,15 @@ async function sendMessage() {
     messageInput.value = '';
     cancelReply();
 
+    // Kirim sinyal berhenti mengetik saat pesan terkirim
+    if (typingChannel) {
+        typingChannel.send({
+            type: 'broadcast',
+            event: 'typing',
+            payload: { userId: currentUserId, isTyping: false }
+        });
+    }
+
     await supabaseClient.from('messages').insert([{
         sender_id: currentUserId,
         receiver_id: activeFriendId,
@@ -716,6 +732,65 @@ if (btnSend) {
 
 if (messageInput) {
     messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
+}
+
+// --- FITUR TYPING INDICATOR (SEDANG MENGETIK) ---
+function setupTypingIndicator() {
+    if (typingChannel) supabaseClient.removeChannel(typingChannel);
+
+    const sortedIds = [currentUserId, activeFriendId].sort().join('-');
+
+    typingChannel = supabaseClient.channel(`typing-${sortedIds}`, {
+        config: { broadcast: { self: false } }
+    });
+
+    typingChannel
+        .on('broadcast', { event: 'typing' }, payload => {
+            if (payload && payload.payload) {
+                const { userId, isTyping } = payload.payload;
+                if (userId === activeFriendId) {
+                    if (isTyping) {
+                        chatStatusIndicator.textContent = 'Sedang mengetik...';
+                        chatStatusIndicator.style.color = '#28a745';
+                    } else {
+                        checkPartnerIdStatus(activeFriendId);
+                    }
+                }
+            }
+        })
+        .subscribe();
+
+    if (messageInput) {
+        // Hapus event listener lama agar tidak menumpuk
+        const newMsgInput = messageInput.cloneNode(true);
+        messageInput.parentNode.replaceChild(newMsgInput, messageInput);
+        
+        // Re-assign referensi elemen input
+        const updatedMessageInput = document.getElementById('message-input');
+        
+        updatedMessageInput.addEventListener('keypress', (e) => { 
+            if (e.key === 'Enter') sendMessage(); 
+        });
+
+        updatedMessageInput.addEventListener('input', () => {
+            if (!typingChannel) return;
+
+            typingChannel.send({
+                type: 'broadcast',
+                event: 'typing',
+                payload: { userId: currentUserId, isTyping: true }
+            });
+
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                typingChannel.send({
+                    type: 'broadcast',
+                    event: 'typing',
+                    payload: { userId: currentUserId, isTyping: false }
+                });
+            }, 2000);
+        });
+    }
 }
 
 // --- LOGIKA MINI GAME TIC-TAC-TOE ---
