@@ -17,7 +17,7 @@ let selectedMessageForAction = null;
 
 let chatSubscription = null;
 let homeSubscription = null;
-let presenceChannel = null;
+let globalPresenceChannel = null;
 
 // DOM Elements
 const loginScreen = document.getElementById('login-screen');
@@ -91,14 +91,16 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-// MENDUKUNG TOMBOL / GESTURE BACK SEMUA DEVICE
+// MENDUKUNG GESTURE BACK / TOMBOL KEMBALI SEMUA DEVICE DENGAN AMAN
 window.addEventListener('popstate', (event) => {
     messageOptionsModal.classList.remove('active');
 
     if (chatScreen.classList.contains('active')) {
         closeChatRoomInternal();
     } else if (profileScreen.classList.contains('active')) {
-        closeProfileScreenInternal();
+        profileScreen.classList.remove('active');
+        homeScreen.classList.add('active');
+        loadFriends();
     }
 });
 
@@ -154,35 +156,43 @@ function showHomeScreen() {
     renderAvatar(myHeaderAvatar, currentUserAvatar, currentUsername);
     loadFriends();
     subscribeHomeRealtime();
-    setupPresence();
+    setupGlobalPresence();
 }
 
-// SETUP PRESENCE (STATUS ONLINE / OFFLINE)
-function setupPresence() {
-    if (presenceChannel) supabaseClient.removeChannel(presenceChannel);
+// SETUP GLOBAL PRESENCE (STATUS REALTIME ONLINE / OFFLINE)
+function setupGlobalPresence() {
+    if (globalPresenceChannel) supabaseClient.removeChannel(globalPresenceChannel);
 
-    presenceChannel = supabaseClient.channel('online-status', {
-        config: { presence: { key: currentUserId } }
+    globalPresenceChannel = supabaseClient.channel('global-online-room', {
+        config: {
+            presence: {
+                key: currentUserId,
+            },
+        },
     });
 
-    presenceChannel.subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-            await presenceChannel.track({ user_id: currentUserId, online_at: new Date().toISOString() });
-        }
-    });
-
-    presenceChannel.on('presence', { event: 'sync' }, () => {
-        const state = presenceChannel.presenceState();
-        if (activeFriendId) {
-            if (state[activeFriendId]) {
-                chatStatusIndicator.textContent = 'Online';
-                chatStatusIndicator.style.color = '#28a745';
-            } else {
-                chatStatusIndicator.textContent = 'Offline';
-                chatStatusIndicator.style.color = '#888';
+    globalPresenceChannel
+        .on('presence', { event: 'sync' }, () => {
+            const state = globalPresenceChannel.presenceState();
+            
+            // Perbarui indikator status partner di header chat room jika sedang dibuka
+            if (activeFriendId) {
+                if (state[activeFriendId]) {
+                    chatStatusIndicator.textContent = 'Online';
+                    chatStatusIndicator.style.color = '#28a745';
+                } else {
+                    chatStatusIndicator.textContent = 'Offline';
+                    chatStatusIndicator.style.color = '#888';
+                }
             }
-        }
-    });
+        })
+        .subscribe(async (status) => {
+            if (status === 'SUBSCRIBED') {
+                myProfileStatus.textContent = 'Online';
+                myProfileStatus.style.color = '#28a745';
+                await globalPresenceChannel.track({ user_id: currentUserId, online_at: new Date().toISOString() });
+            }
+        });
 }
 
 // BUKA HALAMAN PROFIL
@@ -197,12 +207,6 @@ btnOpenProfile.addEventListener('click', () => {
 btnBackProfile.addEventListener('click', () => {
     history.back();
 });
-
-function closeProfileScreenInternal() {
-    profileScreen.classList.remove('active');
-    homeScreen.classList.add('active');
-    loadFriends();
-}
 
 function renderProfileAvatar() {
     if (currentUserAvatar) {
@@ -407,8 +411,8 @@ async function openChatRoom(friendId, friendName, friendAvatar) {
     chatPartnerName.textContent = `@${friendName}`;
     renderAvatar(chatPartnerAvatarContainer, friendAvatar, friendName, '36px');
 
-    if (presenceChannel) {
-        const state = presenceChannel.presenceState();
+    if (globalPresenceChannel) {
+        const state = globalPresenceChannel.presenceState();
         if (state[activeFriendId]) {
             chatStatusIndicator.textContent = 'Online';
             chatStatusIndicator.style.color = '#28a745';
@@ -679,13 +683,13 @@ function subscribeHomeRealtime() {
         .subscribe();
 }
 
-// DETEKSI STATUS VISIBILITAS TAB UNTUK PRESENCE ONLINE / OFFLINE
+// DETEKSI AKTIF/TIDAKNYA TAB WEB UNTUK STATUS ONLINE SECARA REALTIME
 document.addEventListener("visibilitychange", async () => {
     if (document.visibilityState === "visible") {
         myProfileStatus.textContent = 'Online';
         myProfileStatus.style.color = '#28a745';
-        if (presenceChannel) {
-            await presenceChannel.track({ user_id: currentUserId, online_at: new Date().toISOString() });
+        if (globalPresenceChannel) {
+            await globalPresenceChannel.track({ user_id: currentUserId, online_at: new Date().toISOString() });
         }
         if (chatScreen.classList.contains('active') && activeFriendId) {
             await loadMessages();
@@ -698,9 +702,16 @@ document.addEventListener("visibilitychange", async () => {
     } else {
         myProfileStatus.textContent = 'Offline';
         myProfileStatus.style.color = '#888';
-        if (presenceChannel) {
-            await presenceChannel.untrack();
+        if (globalPresenceChannel) {
+            await globalPresenceChannel.untrack();
         }
+    }
+});
+
+// SAAT HALAMAN DITUTUP / KELUAR DARI WEB
+window.addEventListener('beforeunload', () => {
+    if (globalPresenceChannel) {
+        globalPresenceChannel.untrack();
     }
 });
 
@@ -711,7 +722,7 @@ function saveLocalStorage() {
 }
 
 function clearLocalStorage() {
-    if (presenceChannel) supabaseClient.removeChannel(presenceChannel);
+    if (globalPresenceChannel) supabaseClient.removeChannel(globalPresenceChannel);
     localStorage.removeItem('chat_user_id');
     localStorage.removeItem('chat_username');
     localStorage.removeItem('chat_avatar');
