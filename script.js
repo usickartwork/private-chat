@@ -17,6 +17,7 @@ let selectedMessageForAction = null;
 
 let chatSubscription = null;
 let homeSubscription = null;
+let profileStatusSubscription = null;
 
 // DOM Elements
 const loginScreen = document.getElementById('login-screen');
@@ -56,6 +57,7 @@ const homeError = document.getElementById('home-error');
 const friendsList = document.getElementById('friends-list');
 
 const chatPartnerName = document.getElementById('chat-partner-name');
+const chatStatusIndicator = document.getElementById('chat-status-indicator');
 const chatPartnerAvatarContainer = document.getElementById('chat-partner-avatar-container');
 const btnBack = document.getElementById('btn-back');
 const chatMessages = document.getElementById('chat-messages');
@@ -119,7 +121,7 @@ btnRegister.addEventListener('click', async () => {
     const { data: existingUser } = await supabaseClient.from('profiles').select('*').eq('username', username).single();
     if (existingUser) { regError.textContent = 'Username sudah dipakai orang lain!'; return; }
 
-    const { error: insertError } = await supabaseClient.from('profiles').insert([{ username, password }]);
+    const { error: insertError } = await supabaseClient.from('profiles').insert([{ username, password, is_online: false }]);
     if (insertError) { regError.textContent = 'Gagal mendaftar.'; return; }
 
     alert('Akun berhasil dibuat! Silakan masuk.');
@@ -145,7 +147,7 @@ btnLogin.addEventListener('click', async () => {
     showHomeScreen(true);
 });
 
-function showHomeScreen(pushHistory = true) {
+async function showHomeScreen(pushHistory = true) {
     loginScreen.classList.remove('active');
     registerScreen.classList.remove('active');
     profileScreen.classList.remove('active');
@@ -153,6 +155,10 @@ function showHomeScreen(pushHistory = true) {
     homeScreen.classList.add('active');
     myProfileName.textContent = `@${currentUsername}`;
     renderAvatar(myHeaderAvatar, currentUserAvatar, currentUsername);
+
+    // Set status online di database saat masuk home
+    await supabaseClient.from('profiles').update({ is_online: true }).eq('id', currentUserId);
+
     loadFriends();
     subscribeHomeRealtime();
     if (pushHistory) {
@@ -391,9 +397,35 @@ async function openChatRoom(friendId, friendName, friendAvatar) {
     chatPartnerName.textContent = `@${friendName}`;
     renderAvatar(chatPartnerAvatarContainer, friendAvatar, friendName, '36px');
 
+    await checkPartnerStatus(friendId);
+    subscribeProfileStatus(friendId);
+
     await loadMessages();
     await markMessagesAsRead();
     subscribeToRealtime();
+}
+
+async function checkPartnerStatus(friendId) {
+    const { data } = await supabaseClient.from('profiles').select('is_online').eq('id', friendId).single();
+    if (data) {
+        chatStatusIndicator.textContent = data.is_online ? 'Online' : 'Offline';
+        chatStatusIndicator.style.color = data.is_online ? '#28a745' : '#888';
+    }
+}
+
+function subscribeProfileStatus(friendId) {
+    if (profileStatusSubscription) supabaseClient.removeChannel(profileStatusSubscription);
+
+    profileStatusSubscription = supabaseClient
+        .channel(`profile-status-${friendId}`)
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${friendId}` }, payload => {
+            if (payload && payload.new) {
+                const isOnline = payload.new.is_online;
+                chatStatusIndicator.textContent = isOnline ? 'Online' : 'Offline';
+                chatStatusIndicator.style.color = isOnline ? '#28a745' : '#888';
+            }
+        })
+        .subscribe();
 }
 
 // TOMBOL KEMBALI
@@ -403,6 +435,7 @@ btnBack.addEventListener('click', () => {
 
 function closeChatRoomInternal(pushHistory = true) {
     if (chatSubscription) supabaseClient.removeChannel(chatSubscription);
+    if (profileStatusSubscription) supabaseClient.removeChannel(profileStatusSubscription);
     chatScreen.classList.remove('active');
     homeScreen.classList.add('active');
     activeFriendId = null;
@@ -653,8 +686,13 @@ function subscribeHomeRealtime() {
         .subscribe();
 }
 
+// DETEKSI VISIBILITAS TAB UNTUK STATUS ONLINE / OFFLINE SECARA REALTIME
 document.addEventListener("visibilitychange", async () => {
+    if (!currentUserId) return;
+
     if (document.visibilityState === "visible") {
+        await supabaseClient.from('profiles').update({ is_online: true }).eq('id', currentUserId);
+        
         if (chatScreen.classList.contains('active') && activeFriendId) {
             await loadMessages();
             await markMessagesAsRead();
@@ -663,6 +701,14 @@ document.addEventListener("visibilitychange", async () => {
             loadFriends();
             subscribeHomeRealtime();
         }
+    } else {
+        await supabaseClient.from('profiles').update({ is_online: false }).eq('id', currentUserId);
+    }
+});
+
+window.addEventListener('beforeunload', () => {
+    if (currentUserId) {
+        supabaseClient.from('profiles').update({ is_online: false }).eq('id', currentUserId);
     }
 });
 
@@ -673,6 +719,9 @@ function saveLocalStorage() {
 }
 
 function clearLocalStorage() {
+    if (currentUserId) {
+        supabaseClient.from('profiles').update({ is_online: false }).eq('id', currentUserId);
+    }
     localStorage.removeItem('chat_user_id');
     localStorage.removeItem('chat_username');
     localStorage.removeItem('chat_avatar');
