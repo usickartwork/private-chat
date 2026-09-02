@@ -17,7 +17,7 @@ let selectedMessageForAction = null;
 
 let chatSubscription = null;
 let homeSubscription = null;
-let globalPresenceChannel = null;
+let profileStatusSubscription = null;
 
 // DOM Elements
 const loginScreen = document.getElementById('login-screen');
@@ -91,7 +91,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-// MENDUKUNG GESTURE BACK / TOMBOL KEMBALI SEMUA DEVICE DENGAN AMAN
+// GESTURE / TOMBOL BACK DEVICE
 window.addEventListener('popstate', (event) => {
     messageOptionsModal.classList.remove('active');
 
@@ -120,7 +120,7 @@ btnRegister.addEventListener('click', async () => {
     const { data: existingUser } = await supabaseClient.from('profiles').select('*').eq('username', username).single();
     if (existingUser) { regError.textContent = 'Username sudah dipakai orang lain!'; return; }
 
-    const { error: insertError } = await supabaseClient.from('profiles').insert([{ username, password }]);
+    const { error: insertError } = await supabaseClient.from('profiles').insert([{ username, password, is_online: false }]);
     if (insertError) { regError.textContent = 'Gagal mendaftar.'; return; }
 
     alert('Akun berhasil dibuat! Silakan masuk.');
@@ -146,53 +146,22 @@ btnLogin.addEventListener('click', async () => {
     showHomeScreen();
 });
 
-function showHomeScreen() {
+async function showHomeScreen() {
     loginScreen.classList.remove('active');
     registerScreen.classList.remove('active');
     profileScreen.classList.remove('active');
     chatScreen.classList.remove('active');
     homeScreen.classList.add('active');
     myProfileName.textContent = `@${currentUsername}`;
+    myProfileStatus.textContent = 'Online';
+    myProfileStatus.style.color = '#28a745';
     renderAvatar(myHeaderAvatar, currentUserAvatar, currentUsername);
+
+    // Set status online di database
+    await supabaseClient.from('profiles').update({ is_online: true }).eq('id', currentUserId);
+
     loadFriends();
     subscribeHomeRealtime();
-    setupGlobalPresence();
-}
-
-// SETUP GLOBAL PRESENCE (STATUS REALTIME ONLINE / OFFLINE)
-function setupGlobalPresence() {
-    if (globalPresenceChannel) supabaseClient.removeChannel(globalPresenceChannel);
-
-    globalPresenceChannel = supabaseClient.channel('global-online-room', {
-        config: {
-            presence: {
-                key: currentUserId,
-            },
-        },
-    });
-
-    globalPresenceChannel
-        .on('presence', { event: 'sync' }, () => {
-            const state = globalPresenceChannel.presenceState();
-            
-            // Perbarui indikator status partner di header chat room jika sedang dibuka
-            if (activeFriendId) {
-                if (state[activeFriendId]) {
-                    chatStatusIndicator.textContent = 'Online';
-                    chatStatusIndicator.style.color = '#28a745';
-                } else {
-                    chatStatusIndicator.textContent = 'Offline';
-                    chatStatusIndicator.style.color = '#888';
-                }
-            }
-        })
-        .subscribe(async (status) => {
-            if (status === 'SUBSCRIBED') {
-                myProfileStatus.textContent = 'Online';
-                myProfileStatus.style.color = '#28a745';
-                await globalPresenceChannel.track({ user_id: currentUserId, online_at: new Date().toISOString() });
-            }
-        });
 }
 
 // BUKA HALAMAN PROFIL
@@ -411,20 +380,36 @@ async function openChatRoom(friendId, friendName, friendAvatar) {
     chatPartnerName.textContent = `@${friendName}`;
     renderAvatar(chatPartnerAvatarContainer, friendAvatar, friendName, '36px');
 
-    if (globalPresenceChannel) {
-        const state = globalPresenceChannel.presenceState();
-        if (state[activeFriendId]) {
-            chatStatusIndicator.textContent = 'Online';
-            chatStatusIndicator.style.color = '#28a745';
-        } else {
-            chatStatusIndicator.textContent = 'Offline';
-            chatStatusIndicator.style.color = '#888';
-        }
-    }
+    // Ambil status awal partner dari database
+    await checkPartnerStatus(friendId);
+    subscribeProfileStatus(friendId);
 
     await loadMessages();
     await markMessagesAsRead();
     subscribeToRealtime();
+}
+
+async function checkPartnerStatus(friendId) {
+    const { data } = await supabaseClient.from('profiles').select('is_online').eq('id', friendId).single();
+    if (data) {
+        chatStatusIndicator.textContent = data.is_online ? 'Online' : 'Offline';
+        chatStatusIndicator.style.color = data.is_online ? '#28a745' : '#888';
+    }
+}
+
+function subscribeProfileStatus(friendId) {
+    if (profileStatusSubscription) supabaseClient.removeChannel(profileStatusSubscription);
+
+    profileStatusSubscription = supabaseClient
+        .channel(`profile-status-${friendId}`)
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${friendId}` }, payload => {
+            if (payload && payload.new) {
+                const isOnline = payload.new.is_online;
+                chatStatusIndicator.textContent = isOnline ? 'Online' : 'Offline';
+                chatStatusIndicator.style.color = isOnline ? '#28a745' : '#888';
+            }
+        })
+        .subscribe();
 }
 
 // TOMBOL KEMBALI
@@ -434,6 +419,7 @@ btnBack.addEventListener('click', () => {
 
 function closeChatRoomInternal() {
     if (chatSubscription) supabaseClient.removeChannel(chatSubscription);
+    if (profileStatusSubscription) supabaseClient.removeChannel(profileStatusSubscription);
     chatScreen.classList.remove('active');
     homeScreen.classList.add('active');
     activeFriendId = null;
@@ -683,14 +669,15 @@ function subscribeHomeRealtime() {
         .subscribe();
 }
 
-// DETEKSI AKTIF/TIDAKNYA TAB WEB UNTUK STATUS ONLINE SECARA REALTIME
+// DETEKSI VISIBILITAS TAB UNTUK UPDATE STATUS DATABASE SECARA INSTAN
 document.addEventListener("visibilitychange", async () => {
+    if (!currentUserId) return;
+
     if (document.visibilityState === "visible") {
         myProfileStatus.textContent = 'Online';
         myProfileStatus.style.color = '#28a745';
-        if (globalPresenceChannel) {
-            await globalPresenceChannel.track({ user_id: currentUserId, online_at: new Date().toISOString() });
-        }
+        await supabaseClient.from('profiles').update({ is_online: true }).eq('id', currentUserId);
+        
         if (chatScreen.classList.contains('active') && activeFriendId) {
             await loadMessages();
             await markMessagesAsRead();
@@ -702,16 +689,15 @@ document.addEventListener("visibilitychange", async () => {
     } else {
         myProfileStatus.textContent = 'Offline';
         myProfileStatus.style.color = '#888';
-        if (globalPresenceChannel) {
-            await globalPresenceChannel.untrack();
-        }
+        await supabaseClient.from('profiles').update({ is_online: false }).eq('id', currentUserId);
     }
 });
 
-// SAAT HALAMAN DITUTUP / KELUAR DARI WEB
+// SAAT HALAMAN DITUTUP / REFRESH
 window.addEventListener('beforeunload', () => {
-    if (globalPresenceChannel) {
-        globalPresenceChannel.untrack();
+    if (currentUserId) {
+        // Gunakan navigator.sendBeacon atau synchronous update jika memungkinkan
+        supabaseClient.from('profiles').update({ is_online: false }).eq('id', currentUserId);
     }
 });
 
@@ -722,7 +708,9 @@ function saveLocalStorage() {
 }
 
 function clearLocalStorage() {
-    if (globalPresenceChannel) supabaseClient.removeChannel(globalPresenceChannel);
+    if (currentUserId) {
+        supabaseClient.from('profiles').update({ is_online: false }).eq('id', currentUserId);
+    }
     localStorage.removeItem('chat_user_id');
     localStorage.removeItem('chat_username');
     localStorage.removeItem('chat_avatar');
