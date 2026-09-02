@@ -175,6 +175,7 @@ avatarFileInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
+    profileStatus.style.color = '#007bff';
     profileStatus.textContent = 'Mengunggah foto...';
 
     const fileExt = file.name.split('.').pop();
