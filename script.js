@@ -44,7 +44,6 @@ const btnSend = document.getElementById('btn-send');
 // AUTO-LOGIN CHECK
 window.addEventListener('DOMContentLoaded', async () => {
     if (currentUserId && currentUsername) {
-        // Validasi apakah user masih terdaftar di database
         const { data } = await supabaseClient
             .from('profiles')
             .select('*')
@@ -59,6 +58,22 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
+// Penanganan viewport mobile
+if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => {
+        if (chatScreen.classList.contains('active')) {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+    });
+}
+
+messageInput.addEventListener('blur', () => {
+    setTimeout(() => {
+        window.scrollTo(0, 0);
+        document.body.scrollTop = 0;
+    }, 100);
+});
+
 // 1. BUAT / MASUK DENGAN USERNAME
 btnSaveUsername.addEventListener('click', async () => {
     const uname = createUsernameInput.value.trim().toLowerCase();
@@ -68,7 +83,6 @@ btnSaveUsername.addEventListener('click', async () => {
     }
     setupError.textContent = '';
 
-    // Cek apakah username sudah ada
     const { data: existing } = await supabaseClient
         .from('profiles')
         .select('*')
@@ -76,7 +90,6 @@ btnSaveUsername.addEventListener('click', async () => {
         .single();
 
     if (existing) {
-        // Jika session_id sama atau perangkat sama, langsung masuk
         if (existing.session_id === sessionId) {
             currentUserId = existing.id;
             currentUsername = existing.username;
@@ -88,7 +101,6 @@ btnSaveUsername.addEventListener('click', async () => {
         return;
     }
 
-    // Buat profil baru
     const { data: newProfile, error } = await supabaseClient
         .from('profiles')
         .insert([{ username: uname, session_id: sessionId }])
@@ -127,7 +139,6 @@ btnAddFriend.addEventListener('click', async () => {
     }
     homeError.textContent = '';
 
-    // Cari user target
     const { data: targetUser, error: searchError } = await supabaseClient
         .from('profiles')
         .select('*')
@@ -139,18 +150,13 @@ btnAddFriend.addEventListener('click', async () => {
         return;
     }
 
-    // Tambahkan ke tabel friendships (2 arah biar mudah di-query)
-    const { error: friendError } = await supabaseClient
+    // Masukkan relasi dua arah
+    await supabaseClient
         .from('friendships')
         .insert([
             { user_id: currentUserId, friend_id: targetUser.id },
             { user_id: targetUser.id, friend_id: currentUserId }
         ]);
-
-    if (friendError) {
-        homeError.textContent = 'Teman sudah ada dalam daftar!';
-        return;
-    }
 
     friendUsernameInput.value = '';
     loadFriends();
@@ -221,12 +227,21 @@ async function loadMessages() {
 }
 
 async function markMessagesAsRead() {
-    await supabaseClient
+    const { data: unreadMsgs } = await supabaseClient
         .from('messages')
-        .update({ status: 'read' })
+        .select('id')
         .eq('sender_id', activeFriendId)
         .eq('receiver_id', currentUserId)
         .eq('status', 'sent');
+
+    if (unreadMsgs && unreadMsgs.length > 0) {
+        for (let msg of unreadMsgs) {
+            await supabaseClient
+                .from('messages')
+                .update({ status: 'read' })
+                .eq('id', msg.id);
+        }
+    }
 }
 
 function appendMessage(msg) {
@@ -303,14 +318,17 @@ messageInput.addEventListener('keypress', (e) => {
     }
 });
 
-// 5. REALTIME LISTENER
+// 5. REALTIME LISTENER YANG DIPERBAIKI
 function subscribeToRealtime() {
     if (chatSubscription) {
         supabaseClient.removeChannel(chatSubscription);
     }
 
+    // Buat nama channel unik berdasarkan kombinasi dua user yang sedang chat
+    const sortedIds = [currentUserId, activeFriendId].sort().join('-');
+
     chatSubscription = supabaseClient
-        .channel(`chat-${currentUserId}`)
+        .channel(`room-${sortedIds}`)
         .on('postgres_changes', {
             event: 'INSERT',
             schema: 'public',
@@ -318,7 +336,6 @@ function subscribeToRealtime() {
         }, async payload => {
             if (payload && payload.new) {
                 const msg = payload.new;
-                // Jika pesan melibatkan user yang sedang aktif chat
                 if (
                     (msg.sender_id === activeFriendId && msg.receiver_id === currentUserId) ||
                     (msg.sender_id === currentUserId && msg.receiver_id === activeFriendId)
