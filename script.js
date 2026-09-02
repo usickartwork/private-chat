@@ -8,10 +8,12 @@ const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // State Aplikasi
 let currentUserId = localStorage.getItem('chat_user_id') || null;
 let currentUsername = localStorage.getItem('chat_username') || null;
+let currentUserAvatar = localStorage.getItem('chat_avatar') || null;
 let activeFriendId = null;
 let activeFriendName = null;
+let activeFriendAvatar = null;
 let replyingToMessageId = null;
-let selectedMessageForAction = null; // Menyimpan pesan yang sedang dipilih untuk menu opsi
+let selectedMessageForAction = null;
 
 let chatSubscription = null;
 let homeSubscription = null;
@@ -20,6 +22,7 @@ let homeSubscription = null;
 const loginScreen = document.getElementById('login-screen');
 const registerScreen = document.getElementById('register-screen');
 const homeScreen = document.getElementById('home-screen');
+const profileScreen = document.getElementById('profile-screen');
 const chatScreen = document.getElementById('chat-screen');
 
 const loginUsernameInput = document.getElementById('login-username');
@@ -36,13 +39,24 @@ const regError = document.getElementById('reg-error');
 const toLoginBtn = document.getElementById('to-login');
 
 const myProfileName = document.getElementById('my-profile-name');
+const myHeaderAvatar = document.getElementById('my-header-avatar');
+const btnOpenProfile = document.getElementById('btn-open-profile');
+const btnBackProfile = document.getElementById('btn-back-profile');
 const btnLogout = document.getElementById('btn-logout');
+
+const profileLargeAvatar = document.getElementById('profile-large-avatar');
+const profileLargeImg = document.getElementById('profile-large-img');
+const btnChangePhoto = document.getElementById('btn-change-photo');
+const avatarFileInput = document.getElementById('avatar-file-input');
+const profileStatus = document.getElementById('profile-status');
+
 const friendUsernameInput = document.getElementById('friend-username-input');
 const btnAddFriend = document.getElementById('btn-add-friend');
 const homeError = document.getElementById('home-error');
 const friendsList = document.getElementById('friends-list');
 
 const chatPartnerName = document.getElementById('chat-partner-name');
+const chatPartnerAvatarContainer = document.getElementById('chat-partner-avatar-container');
 const btnBack = document.getElementById('btn-back');
 const chatMessages = document.getElementById('chat-messages');
 const messageInput = document.getElementById('message-input');
@@ -53,7 +67,6 @@ const replyingToUser = document.getElementById('replying-to-user');
 const replyingToText = document.getElementById('replying-to-text');
 const btnCancelReply = document.getElementById('btn-cancel-reply');
 
-// Modal Options Elements
 const messageOptionsModal = document.getElementById('message-options-modal');
 const optReply = document.getElementById('opt-reply');
 const optDeleteMe = document.getElementById('opt-delete-me');
@@ -65,8 +78,13 @@ let messageCache = {};
 window.addEventListener('DOMContentLoaded', async () => {
     if (currentUserId && currentUsername) {
         const { data } = await supabaseClient.from('profiles').select('*').eq('id', currentUserId).single();
-        if (data) showHomeScreen();
-        else clearLocalStorage();
+        if (data) {
+            currentUserAvatar = data.avatar_url;
+            saveLocalStorage();
+            showHomeScreen();
+        } else {
+            clearLocalStorage();
+        }
     }
 });
 
@@ -107,6 +125,7 @@ btnLogin.addEventListener('click', async () => {
 
     currentUserId = user.id;
     currentUsername = user.username;
+    currentUserAvatar = user.avatar_url;
     saveLocalStorage();
     showHomeScreen();
 });
@@ -114,11 +133,107 @@ btnLogin.addEventListener('click', async () => {
 function showHomeScreen() {
     loginScreen.classList.remove('active');
     registerScreen.classList.remove('active');
+    profileScreen.classList.remove('active');
     chatScreen.classList.remove('active');
     homeScreen.classList.add('active');
     myProfileName.textContent = `@${currentUsername}`;
+    renderAvatar(myHeaderAvatar, null, currentUsername);
     loadFriends(true);
     subscribeHomeRealtime();
+}
+
+// BUKA HALAMAN PROFIL
+btnOpenProfile.addEventListener('click', () => {
+    homeScreen.classList.remove('active');
+    profileScreen.classList.add('active');
+    renderProfileAvatar();
+    profileStatus.textContent = '';
+});
+
+btnBackProfile.addEventListener('click', () => {
+    profileScreen.classList.remove('active');
+    homeScreen.classList.add('active');
+    loadFriends(false);
+});
+
+function renderProfileAvatar() {
+    if (currentUserAvatar) {
+        profileLargeAvatar.style.display = 'none';
+        profileLargeImg.style.display = 'block';
+        profileLargeImg.src = currentUserAvatar;
+    } else {
+        profileLargeImg.style.display = 'none';
+        profileLargeAvatar.style.display = 'flex';
+        profileLargeAvatar.textContent = currentUsername.charAt(0).toUpperCase();
+    }
+}
+
+// UPLOAD FOTO PROFIL KE SUPABASE STORAGE
+btnChangePhoto.addEventListener('click', () => avatarFileInput.click());
+
+avatarFileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    profileStatus.textContent = 'Mengunggah foto...';
+
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${currentUserId}_${Math.random().toString(36.substring(2))}.${fileExt}`;
+    const filePath = `${fileName}`;
+
+    // Upload ke bucket 'avatars'
+    const { error: uploadError } = await supabaseClient.storage
+        .from('avatars')
+        .upload(filePath, file, { upsert: true });
+
+    if (uploadError) {
+        profileStatus.style.color = '#dc3545';
+        profileStatus.textContent = 'Gagal mengunggah foto.';
+        return;
+    }
+
+    // Ambil Public URL
+    const { data: publicUrlData } = supabaseClient.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+    const avatarUrl = publicUrlData.publicUrl;
+
+    // Simpan ke tabel profiles
+    const { error: updateError } = await supabaseClient
+        .from('profiles')
+        .update({ avatar_url: avatarUrl })
+        .eq('id', currentUserId);
+
+    if (updateError) {
+        profileStatus.style.color = '#dc3545';
+        profileStatus.textContent = 'Gagal memperbarui profil.';
+        return;
+    }
+
+    currentUserAvatar = avatarUrl;
+    saveLocalStorage();
+    renderProfileAvatar();
+    renderAvatar(myHeaderAvatar, currentUserAvatar, currentUsername);
+
+    profileStatus.style.color = '#28a745';
+    profileStatus.textContent = 'Foto profil berhasil diperbarui!';
+});
+
+// BANTU FUNGSI RENDER AVATAR (GAMBAR ATAU INISIAL)
+function renderAvatar(containerEl, avatarUrl, username, size = '36px') {
+    containerEl.style.width = size;
+    containerEl.style.height = size;
+    containerEl.innerHTML = '';
+    
+    if (avatarUrl) {
+        const img = document.createElement('img');
+        img.src = avatarUrl;
+        containerEl.appendChild(img);
+    } else {
+        containerEl.textContent = username ? username.charAt(0).toUpperCase() : '?';
+        containerEl.style.fontSize = parseInt(size) * 0.4 + 'px';
+    }
 }
 
 // TAMBAH TEMAN
@@ -187,45 +302,59 @@ async function loadFriends(isInitial = false) {
         }
 
         let friendEl = document.getElementById(`friend-${friend.id}`);
-        const contentHTML = `
-            <div class="friend-avatar">${friend.username.charAt(0).toUpperCase()}</div>
-            <div class="friend-info">
-                <div class="friend-top-row">
-                    <span class="friend-name">@${friend.username}</span>
-                    <span class="friend-time">${timeStr}</span>
-                </div>
-                <div class="friend-bottom-row">
-                    <span class="friend-last-msg">${escapeHtml(lastMsgText)}</span>
-                    ${isUnread ? `<span class="unread-badge">${unreadCount}</span>` : ''}
-                </div>
-            </div>
-        `;
-
+        
         if (friendEl) {
             friendEl.className = `friend-item ${isUnread ? 'unread' : ''}`;
-            friendEl.innerHTML = contentHTML;
+            const avatarDiv = friendEl.querySelector('.friend-avatar');
+            renderAvatar(avatarDiv, friend.avatar_url, friend.username, '44px');
+            friendEl.querySelector('.friend-time').textContent = timeStr;
+            friendEl.querySelector('.friend-last-msg').textContent = lastMsgText;
+            
+            const bottomRow = friendEl.querySelector('.friend-bottom-row');
+            let badgeEl = bottomRow.querySelector('.unread-badge');
+            if (isUnread) {
+                if (badgeEl) badgeEl.textContent = unreadCount;
+                else bottomRow.insertAdjacentHTML('beforeend', `<span class="unread-badge">${unreadCount}</span>`);
+            } else if (badgeEl) {
+                badgeEl.remove();
+            }
         } else {
             const div = document.createElement('div');
             div.id = `friend-${friend.id}`;
             div.className = `friend-item ${isUnread ? 'unread' : ''}`;
-            div.innerHTML = contentHTML;
-            div.addEventListener('click', () => openChatRoom(friend.id, friend.username));
+            div.innerHTML = `
+                <div class="friend-avatar"></div>
+                <div class="friend-info">
+                    <div class="friend-top-row">
+                        <span class="friend-name">@${friend.username}</span>
+                        <span class="friend-time">${timeStr}</span>
+                    </div>
+                    <div class="friend-bottom-row">
+                        <span class="friend-last-msg">${escapeHtml(lastMsgText)}</span>
+                        ${isUnread ? `<span class="unread-badge">${unreadCount}</span>` : ''}
+                    </div>
+                </div>
+            `;
+            renderAvatar(div.querySelector('.friend-avatar'), friend.avatar_url, friend.username, '44px');
+            div.addEventListener('click', () => openChatRoom(friend.id, friend.username, friend.avatar_url));
             friendsList.appendChild(div);
         }
     }
 }
 
 // BUKA RUANG CHAT
-async function openChatRoom(friendId, friendName) {
+async function openChatRoom(friendId, friendName, friendAvatar) {
     if (homeSubscription) supabaseClient.removeChannel(homeSubscription);
 
     activeFriendId = friendId;
     activeFriendName = friendName;
+    activeFriendAvatar = friendAvatar;
     cancelReply();
 
     homeScreen.classList.remove('active');
     chatScreen.classList.add('active');
     chatPartnerName.textContent = `@${friendName}`;
+    renderAvatar(chatPartnerAvatarContainer, friendAvatar, friendName, '36px');
 
     await loadMessages();
     await markMessagesAsRead();
@@ -245,7 +374,6 @@ async function loadMessages() {
     if (!error && messages) {
         messages.forEach(msg => {
             messageCache[msg.id] = msg;
-            // Sembunyikan jika dihapus untuk user ini sendiri
             if (msg.sender_id === currentUserId && msg.deleted_for_sender) return;
             if (msg.receiver_id === currentUserId && msg.deleted_for_receiver) return;
             appendMessage(msg);
@@ -323,14 +451,12 @@ function appendMessage(msg) {
         </div>
     `;
 
-    // FITUR SWIPE TO REPLY (Geser ke Kanan)
+    // Swipe to Reply
     let startX = 0;
     div.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; });
     div.addEventListener('touchmove', (e) => {
         let diff = e.touches[0].clientX - startX;
-        if (diff > 0 && diff < 100) {
-            wrapper.style.transform = `translateX(${diff}px)`;
-        }
+        if (diff > 0 && diff < 100) wrapper.style.transform = `translateX(${diff}px)`;
     });
     div.addEventListener('touchend', (e) => {
         let diff = e.changedTouches[0].clientX - startX;
@@ -340,7 +466,7 @@ function appendMessage(msg) {
         }
     });
 
-    // FITUR LONG PRESS (Tekan Tahan untuk Menu Opsi)
+    // Long Press Menu
     let pressTimer;
     div.addEventListener('mousedown', () => { pressTimer = setTimeout(() => openMessageOptions(msg), 600); });
     div.addEventListener('mouseup', () => clearTimeout(pressTimer));
@@ -352,18 +478,15 @@ function appendMessage(msg) {
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-// BUKA MODAL OPSI PESAN
 function openMessageOptions(msg) {
     selectedMessageForAction = msg;
-    if (msg.is_deleted_for_all) return; // Jangan tampilkan opsi jika sudah dihapus
+    if (msg.is_deleted_for_all) return;
 
-    // Sembunyikan opsi "Hapus untuk Semua Orang" jika bukan pesan yang dikirim sendiri
     if (msg.sender_id !== currentUserId) {
         optDeleteAll.style.display = 'none';
     } else {
         optDeleteAll.style.display = 'block';
     }
-
     messageOptionsModal.classList.add('active');
 }
 
@@ -376,7 +499,6 @@ optReply.addEventListener('click', () => {
     triggerReply(msg.id, isOutgoing ? 'Kamu' : `@${activeFriendName}`, msg.message);
 });
 
-// HAPUS UNTUK SAYA (DI PREVIEW / TAMPILAN SENDIRI)
 optDeleteMe.addEventListener('click', async () => {
     messageOptionsModal.classList.remove('active');
     const msg = selectedMessageForAction;
@@ -389,15 +511,12 @@ optDeleteMe.addEventListener('click', async () => {
     if (el) el.remove();
 });
 
-// HAPUS UNTUK SEMUA ORANG
 optDeleteAll.addEventListener('click', async () => {
     messageOptionsModal.classList.remove('active');
     const msg = selectedMessageForAction;
-
     await supabaseClient.from('messages').update({ is_deleted_for_all: true, message: '' }).eq('id', msg.id);
 });
 
-// TRIGGER REPLY
 function triggerReply(msgId, senderLabel, text) {
     replyingToMessageId = msgId;
     replyingToUser.textContent = `Membalas ke ${senderLabel}`;
@@ -438,7 +557,6 @@ async function sendMessage() {
 btnSend.addEventListener('click', sendMessage);
 messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
 
-// REALTIME CHAT
 function subscribeToRealtime() {
     if (chatSubscription) supabaseClient.removeChannel(chatSubscription);
 
@@ -501,13 +619,16 @@ document.addEventListener("visibilitychange", async () => {
 function saveLocalStorage() {
     localStorage.setItem('chat_user_id', currentUserId);
     localStorage.setItem('chat_username', currentUsername);
+    if (currentUserAvatar) localStorage.setItem('chat_avatar', currentUserAvatar);
 }
 
 function clearLocalStorage() {
     localStorage.removeItem('chat_user_id');
     localStorage.removeItem('chat_username');
+    localStorage.removeItem('chat_avatar');
     currentUserId = null;
     currentUsername = null;
+    currentUserAvatar = null;
 }
 
 btnBack.addEventListener('click', () => {

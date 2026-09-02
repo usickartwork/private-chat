@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Private Chat - Advanced</title>
+    <title>Private Chat - Profile & Avatar</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -56,9 +56,12 @@
     <!-- 3. SCREEN: HOME / CONTACT LIST -->
     <div id="home-screen" class="screen">
         <div class="home-header">
-            <div>
-                <h3 id="my-profile-name">Halo, -</h3>
-                <span id="my-profile-status">Online</span>
+            <div class="my-profile-preview" id="btn-open-profile" style="cursor: pointer; display: flex; align-items: center; gap: 10px;">
+                <div id="my-header-avatar" class="friend-avatar" style="width: 36px; height: 36px; font-size: 14px;">-</div>
+                <div>
+                    <h3 id="my-profile-name" style="font-size: 14px;">Halo, -</h3>
+                    <span style="font-size: 11px; color: #0084ff;">Edit Profil & Foto</span>
+                </div>
             </div>
             <button id="btn-logout" class="btn-icon-text">Keluar</button>
         </div>
@@ -73,19 +76,42 @@
         <div id="friends-list" class="friends-list"></div>
     </div>
 
-    <!-- 4. SCREEN: CHAT ROOM -->
+    <!-- 4. SCREEN: PROFILE SETTINGS -->
+    <div id="profile-screen" class="screen">
+        <div class="chat-header">
+            <button id="btn-back-profile" class="btn-icon">←</button>
+            <div class="chat-info">
+                <h3>Pengaturan Profil</h3>
+            </div>
+        </div>
+        <div class="card" style="align-items: center; text-align: center; justify-content: flex-start; padding-top: 40px;">
+            <div id="profile-pic-container" style="position: relative; margin-bottom: 20px; cursor: pointer;">
+                <div id="profile-large-avatar" class="friend-avatar" style="width: 90px; height: 90px; font-size: 36px;">-</div>
+                <img id="profile-large-img" style="display: none; width: 90px; height: 90px; border-radius: 50%; object-fit: cover;" />
+            </div>
+            <input type="file" id="avatar-file-input" accept="image/*" style="display: none;">
+            <button id="btn-change-photo" class="btn primary" style="width: auto; padding: 10px 20px; font-size: 14px;">Pilih Foto Profil Baru</button>
+            <p id="profile-status" class="error-small" style="color: #28a745;"></p>
+        </div>
+    </div>
+
+    <!-- 5. SCREEN: CHAT ROOM -->
     <div id="chat-screen" class="screen">
         <div class="chat-header">
             <button id="btn-back" class="btn-icon">←</button>
-            <div class="chat-info">
-                <h3 id="chat-partner-name">Nama Teman</h3>
-                <span id="chat-status-indicator">Online</span>
+            <div class="chat-info" style="display: flex; align-items: center; gap: 10px;">
+                <div id="chat-partner-avatar-container">
+                    <div id="chat-partner-avatar" class="friend-avatar" style="width: 36px; height: 36px; font-size: 14px;">-</div>
+                </div>
+                <div>
+                    <h3 id="chat-partner-name">Nama Teman</h3>
+                    <span id="chat-status-indicator">Online</span>
+                </div>
             </div>
         </div>
 
         <div id="chat-messages" class="chat-messages"></div>
 
-        <!-- Panel Input & Reply Preview -->
         <div class="chat-input-container">
             <div id="reply-preview-box" class="reply-preview-box">
                 <div class="reply-preview-content">
@@ -101,7 +127,7 @@
         </div>
     </div>
 
-    <!-- MODAL MENU OPSI PESAN (TEKAN TAHAN) -->
+    <!-- MODAL OPSI PESAN -->
     <div id="message-options-modal" class="modal-backdrop">
         <div class="modal-content">
             <button id="opt-reply">Balas (Reply)</button>
