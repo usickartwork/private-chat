@@ -7,6 +7,17 @@
     <link rel="stylesheet" href="style.css">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#000000">
+
+    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+    <script>
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+      OneSignalDeferred.push(async function(OneSignal) {
+        await OneSignal.init({
+          appId: "ff3838e1-c0bc-43d7-8c90-e5ba7643a842",
+        });
+      });
+    </script>
+
     <style>
         .profile-menu-list {
             width: 100%;
@@ -94,7 +105,6 @@
     </style>
 </head>
 <body>
-    <!-- 1. SCREEN: LOGIN -->
     <div id="login-screen" class="screen active">
         <div class="card">
             <h2>Masuk</h2>
@@ -115,7 +125,6 @@
         </div>
     </div>
 
-    <!-- 2. SCREEN: REGISTER -->
     <div id="register-screen" class="screen">
         <div class="card">
             <h2>Buat Akun</h2>
@@ -140,23 +149,19 @@
         </div>
     </div>
 
-    <!-- 3. SCREEN: HOME / CONTACT LIST -->
     <div id="home-screen" class="screen">
         <div class="glow-header" style="padding: 20px 16px 20px 16px; background: #000000; border-bottom: 1px solid #212529; display: flex; flex-direction: column; gap: 12px;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <!-- Profil di pojok KIRI atas digeser sedikit ke kanan dengan ukuran besar & border putih -->
                 <button id="btn-open-profile" style="background: none; border: none; cursor: pointer; padding: 0; display: flex; align-items: center; flex-shrink: 0; margin-left: 6px;">
                     <div id="my-header-avatar" class="friend-avatar header-profile-btn" style="width: 52px; height: 52px; font-size: 18px; border: 3px solid #ffffff; box-shadow: 0 4px 14px rgba(0,0,0,0.4);">-</div>
                 </button>
 
-                <!-- Bagian Tengah Header: Teks terstruktur -->
                 <div style="display: flex; flex-direction: column; align-items: center; text-align: center; flex: 1; gap: 2px; padding: 0 4px;">
                     <span style="font-size: 9px; font-weight: 700; letter-spacing: 2px; color: #a3a3a3; text-transform: uppercase;">Encrypted Network</span>
                     <h1 class="glow-title" style="font-size: 18px; font-weight: bold; color: #ffffff; margin: 0; line-height: 1.1; letter-spacing: 1px;">CHAT MESSENGER</h1>
                     <span id="my-profile-name" style="font-size: 11px; color: #737373; max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">-</span>
                 </div>
 
-                <!-- Placeholder kanan dengan lebar yang menyesuaikan -->
                 <div style="width: 52px;"></div>
             </div>
             <div style="position: relative; margin-top: 4px;">
@@ -171,7 +176,6 @@
 
         <div id="friends-list" class="friends-list"></div>
 
-        <!-- Tombol Tambah (+) Melayang di Tengah Bawah dengan Bingkai Hitam & Border Putih -->
         <div class="floating-center-action">
             <button id="btn-open-add-friend-modal" class="floating-add-btn">
                 <span>＋</span>
@@ -179,7 +183,6 @@
         </div>
     </div>
 
-    <!-- MODAL POPUP TAMBAH TEMAN -->
     <div id="add-friend-modal" class="add-friend-modal">
         <div class="add-friend-dialog">
             <h3 style="font-size: 16px; color: #333; margin-bottom: 4px;">Tambah Teman Baru</h3>
@@ -193,7 +196,6 @@
         </div>
     </div>
 
-    <!-- 4. SCREEN: PROFILE & SETTINGS -->
     <div id="profile-screen" class="screen">
         <div class="chat-header">
             <button id="btn-back-profile" class="btn-icon">←</button>
@@ -211,7 +213,6 @@
             <p id="profile-status" class="error-small" style="color: #28a745; margin-top: 4px;"></p>
             
             <div class="profile-menu-list">
-                <!-- Tombol Manual untuk Meminta Izin Notifikasi -->
                 <button id="btn-request-notif" class="profile-menu-item" style="background: #f1f3f5; color: #111;">
                     <span>🔔 Aktifkan Notifikasi Pesan</span>
                     <span>→</span>
@@ -224,7 +225,6 @@
         </div>
     </div>
 
-    <!-- 5. SCREEN: CHAT ROOM -->
     <div id="chat-screen" class="screen">
         <div class="chat-header">
             <button id="btn-back" class="btn-icon">←</button>
@@ -255,7 +255,6 @@
         </div>
     </div>
 
-    <!-- MODAL OPSI PESAN -->
     <div id="message-options-modal" class="modal-backdrop">
         <div class="modal-content">
             <button id="opt-reply">Balas (Reply)</button>
@@ -265,7 +264,6 @@
         </div>
     </div>
 
-    <!-- MODAL / PAPAN MINI GAME TIC-TAC-TOE -->
     <div id="game-modal" class="modal-backdrop">
         <div class="modal-content" style="align-items: center; padding: 24px; border-radius: 20px;">
             <h3 style="margin-bottom: 4px; font-size: 18px; color: #111;">Tic-Tac-Toe Duel</h3>
@@ -311,7 +309,7 @@
             }
         });
 
-        // Register Service Worker untuk PWA & Notifikasi
+        // Register Service Worker standar untuk PWA
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('/sw.js')
