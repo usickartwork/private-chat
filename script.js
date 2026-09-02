@@ -165,18 +165,31 @@ btnLogin.addEventListener('click', async () => {
     currentUsername = user.username;
     currentUserAvatar = user.avatar_url;
     saveLocalStorage();
-    await requestNotificationPermission();
     showHomeScreen(true);
 });
 
-async function requestNotificationPermission() {
-    if ('Notification' in window && Notification.permission !== 'granted') {
-        try {
-            await Notification.requestPermission();
-        } catch (e) {
-            console.error('Gagal meminta izin notifikasi', e);
+// --- TOMBOL MANUAL IZIN NOTIFIKASI DI PROFIL ---
+const btnRequestNotif = document.getElementById('btn-request-notif');
+if (btnRequestNotif) {
+    btnRequestNotif.addEventListener('click', async () => {
+        if (!('Notification' in window)) {
+            alert('Browser kamu tidak mendukung fitur notifikasi.');
+            return;
         }
-    }
+
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+            alert('Berhasil! Izin notifikasi telah diaktifkan.');
+            new Notification('Textinaja', {
+                body: 'Notifikasi berhasil diaktifkan dan siap digunakan!',
+                icon: 'https://cdn-icons-png.flaticon.com/512/1041/1041916.png'
+            });
+        } else if (permission === 'denied') {
+            alert('Izin notifikasi diblokir oleh browser. Buka setelan gembok/site settings di samping alamat URL browser kamu, lalu ubah izin Notifications menjadi "Allow" (Diizinkan).');
+        } else {
+            alert('Permintaan izin notifikasi ditutup atau diabaikan.');
+        }
+    });
 }
 
 async function showHomeScreen(pushHistory = true) {
