@@ -92,7 +92,7 @@
             box-shadow: 0 8px 24px rgba(0,0,0,0.2);
         }
 
-        /* --- OVERRIDE TOTAL WARNA BIRU MENJADI HITAM / ELEGAN --- */
+        /* --- EFEK GLOW & GAYA MONOKROMATIK HITAM --- */
         .glow-header {
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
         }
@@ -115,7 +115,6 @@
             background: #ffffff !important;
         }
 
-        /* Paksa semua tombol primary dan interaksi lain jadi hitam */
         .btn.primary, button.primary {
             background: #000000 !important;
             border-color: #000000 !important;
@@ -129,30 +128,6 @@
 
         .card {
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08), 0 0 15px rgba(0, 0, 0, 0.05);
-        }
-
-        /* Elemen chat, preview, dan link yang tadinya biru */
-        .reply-preview-box {
-            border-left: 3px solid #000000 !important;
-        }
-        #replying-to-user {
-            color: #000000 !important;
-        }
-        .quoted-msg {
-            border-left: 3px solid #000000 !important;
-        }
-        .quoted-sender {
-            color: #000000 !important;
-        }
-        .btn-send {
-            background: #000000 !important;
-            color: #ffffff !important;
-        }
-        .auth-link, .switch-auth span {
-            color: #000000 !important;
-        }
-        .friend-avatar {
-            background: #000000 !important;
         }
     </style>
 </head>
@@ -205,12 +180,14 @@
 
     <!-- 3. SCREEN: HOME / CONTACT LIST -->
     <div id="home-screen" class="screen">
-        <div class="glow-header" style="padding: 16px 16px 20px 16px; background: #000000; border-bottom: 1px solid #212529; display: flex; flex-direction: column; gap: 14px;">
+        <!-- Header dengan padding atas bawah agar slot kolom pencarian agak diturunkan ke dalam frame -->
+        <div class="glow-header" style="padding: 20px 16px 24px 16px; background: #000000; border-bottom: 1px solid #212529; display: flex; flex-direction: column; gap: 16px;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <h1 class="glow-title" style="font-size: 22px; font-weight: bold; color: #ffffff; margin: 0;">Textinaja &gt;</h1>
                 <button id="btn-open-add-friend-modal" class="glow-btn-add" style="background: #ffffff; border: none; color: #000000; font-size: 20px; font-weight: bold; cursor: pointer; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border-radius: 50%;">＋</button>
             </div>
-            <div style="position: relative;">
+            <!-- Slot Kolom Pencarian yang diturunkan posisinya di dalam frame -->
+            <div style="position: relative; margin-top: 4px;">
                 <input type="text" id="search-contact-input" placeholder="Cari kontak..." autocomplete="off" style="width: 100%; padding: 10px 14px 10px 36px; border: none; border-radius: 20px; font-size: 13px; outline: none; background: #f8f9fa; color: #333; transition: all 0.2s ease;">
                 <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 13px; color: #adb5bd;">🔍</span>
             </div>
@@ -279,12 +256,14 @@
         <div class="chat-header">
             <button id="btn-back" class="btn-icon">←</button>
             <div id="chat-partner-avatar-container" class="friend-avatar" style="width: 38px; height: 38px; font-size: 15px; flex-shrink: 0;">-</div>
-            <div class="chat-info">
+            <div class="chat-info" style="flex: 1;">
                 <div>
                     <h3 id="chat-partner-name">Nama Teman</h3>
                     <span id="chat-status-indicator">Online</span>
                 </div>
             </div>
+            <!-- Tombol Pintasan Ajak Main Game -->
+            <button id="btn-invite-game" style="background: #000; color: #fff; border: none; padding: 6px 12px; border-radius: 14px; font-size: 12px; font-weight: 600; cursor: pointer;">🎮 Main</button>
         </div>
 
         <div id="chat-messages" class="chat-messages"></div>
@@ -311,6 +290,28 @@
             <button id="opt-delete-me">Hapus untuk Saya</button>
             <button id="opt-delete-all" class="danger-text">Hapus untuk Semua Orang</button>
             <button id="opt-cancel" class="cancel-btn">Batal</button>
+        </div>
+    </div>
+
+    <!-- MODAL / PAPAN MINI GAME TIC-TAC-TOE -->
+    <div id="game-modal" class="modal-backdrop">
+        <div class="modal-content" style="align-items: center; padding: 24px; border-radius: 20px;">
+            <h3 style="margin-bottom: 4px; font-size: 18px; color: #111;">Tic-Tac-Toe Duel</h3>
+            <p id="game-status-text" style="font-size: 13px; color: #666; margin-bottom: 16px;">Menunggu giliran...</p>
+            
+            <div style="display: grid; grid-template-columns: repeat(3, 80px); grid-template-rows: repeat(3, 80px); gap: 8px; background: #e2e8f0; padding: 8px; border-radius: 12px;">
+                <button class="game-cell" data-index="0" style="background: #fff; border: none; font-size: 32px; font-weight: bold; cursor: pointer; border-radius: 8px; color: #111;"></button>
+                <button class="game-cell" data-index="1" style="background: #fff; border: none; font-size: 32px; font-weight: bold; cursor: pointer; border-radius: 8px; color: #111;"></button>
+                <button class="game-cell" data-index="2" style="background: #fff; border: none; font-size: 32px; font-weight: bold; cursor: pointer; border-radius: 8px; color: #111;"></button>
+                <button class="game-cell" data-index="3" style="background: #fff; border: none; font-size: 32px; font-weight: bold; cursor: pointer; border-radius: 8px; color: #111;"></button>
+                <button class="game-cell" data-index="4" style="background: #fff; border: none; font-size: 32px; font-weight: bold; cursor: pointer; border-radius: 8px; color: #111;"></button>
+                <button class="game-cell" data-index="5" style="background: #fff; border: none; font-size: 32px; font-weight: bold; cursor: pointer; border-radius: 8px; color: #111;"></button>
+                <button class="game-cell" data-index="6" style="background: #fff; border: none; font-size: 32px; font-weight: bold; cursor: pointer; border-radius: 8px; color: #111;"></button>
+                <button class="game-cell" data-index="7" style="background: #fff; border: none; font-size: 32px; font-weight: bold; cursor: pointer; border-radius: 8px; color: #111;"></button>
+                <button class="game-cell" data-index="8" style="background: #fff; border: none; font-size: 32px; font-weight: bold; cursor: pointer; border-radius: 8px; color: #111;"></button>
+            </div>
+
+            <button id="btn-close-game" class="btn primary" style="margin-top: 16px; width: 100%; max-width: 256px;">Tutup Game</button>
         </div>
     </div>
 
