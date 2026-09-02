@@ -273,9 +273,14 @@ messageInput.addEventListener('keypress', (e) => {
 });
 
 // Realtime Subscription (Mendengar pesan baru & perubahan peserta)
+// Realtime Subscription (Mendengar pesan baru & perubahan peserta)
 function subscribeToRealtime() {
+    if (messageSubscription) {
+        supabaseClient.removeChannel(messageSubscription);
+    }
+
     messageSubscription = supabaseClient
-        .channel(`room:${currentRoomId}`)
+        .channel('public-chat-room')
         .on('postgres_changes', {
             event: 'INSERT',
             schema: 'public',
@@ -292,7 +297,9 @@ function subscribeToRealtime() {
         }, () => {
             loadParticipantsAndHeader();
         })
-        .subscribe();
+        .subscribe((status) => {
+            console.log("Realtime status:", status);
+        });
 }
 
 // Keluar / Kembali ke Home
