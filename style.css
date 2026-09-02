@@ -174,6 +174,7 @@ input[type="text"]:focus {
     border-bottom: 1px solid #f0f2f5;
     cursor: pointer;
     transition: background 0.1s;
+    gap: 12px;
 }
 
 .friend-item:hover {
@@ -181,8 +182,8 @@ input[type="text"]:focus {
 }
 
 .friend-avatar {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     background: #007bff;
     color: white;
     border-radius: 50%;
@@ -190,12 +191,20 @@ input[type="text"]:focus {
     align-items: center;
     justify-content: center;
     font-weight: bold;
-    font-size: 16px;
-    margin-right: 12px;
+    font-size: 18px;
+    flex-shrink: 0;
 }
 
 .friend-info {
     flex: 1;
+    min-width: 0;
+}
+
+.friend-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 3px;
 }
 
 .friend-name {
@@ -204,10 +213,40 @@ input[type="text"]:focus {
     color: #1a1a1a;
 }
 
+.friend-time {
+    font-size: 11px;
+    color: #888;
+}
+
+.friend-bottom-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
 .friend-last-msg {
     font-size: 13px;
     color: #666;
-    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 240px;
+}
+
+.friend-item.unread .friend-last-msg {
+    font-weight: bold;
+    color: #111;
+}
+
+.unread-badge {
+    background-color: #28a745;
+    color: white;
+    font-size: 11px;
+    font-weight: bold;
+    padding: 2px 6px;
+    border-radius: 10px;
+    min-width: 18px;
+    text-align: center;
 }
 
 /* Chat Screen Styles */

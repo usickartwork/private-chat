@@ -18,6 +18,7 @@ if (!sessionId) {
 }
 
 let chatSubscription = null;
+let homeSubscription = null;
 
 // DOM Elements
 const setupScreen = document.getElementById('setup-screen');
@@ -124,6 +125,7 @@ function showHomeScreen() {
     homeScreen.classList.add('active');
     myProfileName.textContent = `@${currentUsername}`;
     loadFriends();
+    subscribeHomeRealtime();
 }
 
 // 2. TAMBAH TEMAN BERDASARKAN USERNAME
@@ -161,7 +163,7 @@ btnAddFriend.addEventListener('click', async () => {
     loadFriends();
 });
 
-// 3. MUAT DAFTAR TEMAN
+// 3. MUAT DAFTAR TEMAN DENGAN PREVIEW PESAN & INDIKATOR
 async function loadFriends() {
     friendsList.innerHTML = '';
     const { data: friendships, error } = await supabaseClient
@@ -182,24 +184,67 @@ async function loadFriends() {
         .in('id', friendIds);
 
     if (friendsProfiles) {
-        friendsProfiles.forEach(friend => {
+        for (const friend of friendsProfiles) {
+            // Ambil pesan terakhir antara user dan teman ini
+            const { data: lastMsgs } = await supabaseClient
+                .from('messages')
+                .select('*')
+                .or(`and(sender_id.eq.${currentUserId},receiver_id.eq.${friend.id}),and(sender_id.eq.${friend.id},receiver_id.eq.${currentUserId})`)
+                .order('created_at', { ascending: false })
+                .limit(1);
+
+            // Hitung pesan belum dibaca dari teman ini
+            const { count: unreadCount } = await supabaseClient
+                .from('messages')
+                .select('*', { count: 'exact', head: true })
+                .eq('sender_id', friend.id)
+                .eq('receiver_id', currentUserId)
+                .eq('status', 'sent');
+
+            let lastMsgText = 'Belum ada percakapan';
+            let timeStr = '';
+            let isUnread = unreadCount > 0;
+
+            if (lastMsgs && lastMsgs.length > 0) {
+                const msg = lastMsgs[0];
+                const prefix = msg.sender_id === currentUserId ? 'Kamu: ' : '';
+                lastMsgText = prefix + msg.message;
+                const msgDate = new Date(msg.created_at);
+                const today = new Date();
+                if (msgDate.toDateString() === today.toDateString()) {
+                    timeStr = msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                } else {
+                    timeStr = msgDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
+                }
+            }
+
             const div = document.createElement('div');
-            div.className = 'friend-item';
+            div.className = `friend-item ${isUnread ? 'unread' : ''}`;
             div.innerHTML = `
                 <div class="friend-avatar">${friend.username.charAt(0).toUpperCase()}</div>
                 <div class="friend-info">
-                    <div class="friend-name">@${friend.username}</div>
-                    <div class="friend-last-msg">Klik untuk mulai chat</div>
+                    <div class="friend-top-row">
+                        <span class="friend-name">@${friend.username}</span>
+                        <span class="friend-time">${timeStr}</span>
+                    </div>
+                    <div class="friend-bottom-row">
+                        <span class="friend-last-msg">${escapeHtml(lastMsgText)}</span>
+                        ${isUnread ? `<span class="unread-badge">${unreadCount}</span>` : ''}
+                    </div>
                 </div>
             `;
             div.addEventListener('click', () => openChatRoom(friend.id, friend.username));
             friendsList.appendChild(div);
-        });
+        }
     }
 }
 
 // 4. BUKA RUANG CHAT DENGAN TEMAN
 async function openChatRoom(friendId, friendName) {
+    if (homeSubscription) {
+        supabaseClient.removeChannel(homeSubscription);
+    }
+
     activeFriendId = friendId;
     activeFriendName = friendName;
 
@@ -226,21 +271,12 @@ async function loadMessages() {
 }
 
 async function markMessagesAsRead() {
-    const { data: unreadMsgs } = await supabaseClient
+    await supabaseClient
         .from('messages')
-        .select('id')
+        .update({ status: 'read' })
         .eq('sender_id', activeFriendId)
         .eq('receiver_id', currentUserId)
         .eq('status', 'sent');
-
-    if (unreadMsgs && unreadMsgs.length > 0) {
-        for (let msg of unreadMsgs) {
-            await supabaseClient
-                .from('messages')
-                .update({ status: 'read' })
-                .eq('id', msg.id);
-        }
-    }
 }
 
 function appendMessage(msg) {
@@ -317,7 +353,7 @@ messageInput.addEventListener('keypress', (e) => {
     }
 });
 
-// 5. REALTIME LISTENER
+// 5. REALTIME LISTENER DI HALAMAN CHAT
 function subscribeToRealtime() {
     if (chatSubscription) {
         supabaseClient.removeChannel(chatSubscription);
@@ -366,6 +402,27 @@ function subscribeToRealtime() {
         .subscribe();
 }
 
+// 6. REALTIME LISTENER DI HALAMAN HOME (UNTUK UPDATE PREVIEW KONTAK SECARA LIVE)
+function subscribeHomeRealtime() {
+    if (homeSubscription) {
+        supabaseClient.removeChannel(homeSubscription);
+    }
+
+    homeSubscription = supabaseClient
+        .channel(`home-${currentUserId}`)
+        .on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            filter: `receiver_id=eq.${currentUserId}`
+        }, () => {
+            if (homeScreen.classList.contains('active')) {
+                loadFriends();
+            }
+        })
+        .subscribe();
+}
+
 // Otomatis sinkronisasi ulang saat PWA kembali dibuka / aktif di layar
 document.addEventListener("visibilitychange", async () => {
     if (document.visibilityState === "visible") {
@@ -375,6 +432,7 @@ document.addEventListener("visibilitychange", async () => {
             subscribeToRealtime();
         } else if (homeScreen.classList.contains('active')) {
             loadFriends();
+            subscribeHomeRealtime();
         }
     }
 });
@@ -398,6 +456,7 @@ btnBack.addEventListener('click', () => {
     chatScreen.classList.remove('active');
     homeScreen.classList.add('active');
     loadFriends();
+    subscribeHomeRealtime();
 });
 
 btnLogout.addEventListener('click', () => {
