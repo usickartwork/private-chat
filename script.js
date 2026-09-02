@@ -1,11 +1,9 @@
-// Konfigurasi Supabase
 const SUPABASE_URL = 'https://frvcokzxlpwhpiougcpy.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZydmNva3p4bHB3aHBpb3VnY3B5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgzMTg4MjYsImV4cCI6MjEwMzg5NDgyNn0.ECF67GKqhOnX7kEKPDgyBpR044gAKPUZD1TARFkHNIY';
 
 const { createClient } = supabase;
 const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// State Aplikasi
 let currentUserId = localStorage.getItem('chat_user_id') || null;
 let currentUsername = localStorage.getItem('chat_username') || null;
 let currentUserAvatar = localStorage.getItem('chat_avatar') || null;
@@ -19,7 +17,6 @@ let chatSubscription = null;
 let homeSubscription = null;
 let profileStatusSubscription = null;
 
-// DOM Elements
 const loginScreen = document.getElementById('login-screen');
 const registerScreen = document.getElementById('register-screen');
 const homeScreen = document.getElementById('home-screen');
@@ -102,7 +99,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-// PENGATURAN TOMBOL BACK / GESTURE DEVICE
 window.addEventListener('popstate', (event) => {
     messageOptionsModal.classList.remove('active');
 
@@ -118,7 +114,6 @@ window.addEventListener('popstate', (event) => {
 toRegisterBtn.addEventListener('click', () => { loginScreen.classList.remove('active'); registerScreen.classList.add('active'); });
 toLoginBtn.addEventListener('click', () => { registerScreen.classList.remove('active'); loginScreen.classList.add('active'); });
 
-// REGISTER
 btnRegister.addEventListener('click', async () => {
     const username = regUsernameInput.value.trim().toLowerCase();
     const password = regPasswordInput.value.trim();
@@ -139,7 +134,6 @@ btnRegister.addEventListener('click', async () => {
     loginScreen.classList.add('active');
 });
 
-// LOGIN
 btnLogin.addEventListener('click', async () => {
     const username = loginUsernameInput.value.trim().toLowerCase();
     const password = loginPasswordInput.value.trim();
@@ -175,7 +169,6 @@ async function showHomeScreen(pushHistory = true) {
     }
 }
 
-// BUKA HALAMAN PROFIL
 if (btnOpenProfile) {
     btnOpenProfile.addEventListener('click', () => {
         homeScreen.classList.remove('active');
@@ -205,7 +198,6 @@ function renderProfileAvatar() {
     }
 }
 
-// UPLOAD FOTO PROFIL KE SUPABASE STORAGE
 if (btnChangePhoto) {
     btnChangePhoto.addEventListener('click', () => avatarFileInput.click());
 }
@@ -275,7 +267,6 @@ function renderAvatar(containerEl, avatarUrl, username, size = '36px') {
     }
 }
 
-// TAMBAH TEMAN
 if (btnAddFriend) {
     btnAddFriend.addEventListener('click', async () => {
         const targetUsername = friendUsernameInput.value.trim().toLowerCase();
@@ -309,7 +300,6 @@ if (btnAddFriend) {
     });
 }
 
-// MUAT DAFTAR TEMAN
 async function loadFriends() {
     if (!currentUserId) return;
 
@@ -404,7 +394,6 @@ async function loadFriends() {
     }
 }
 
-// BUKA RUANG CHAT
 async function openChatRoom(friendId, friendName, friendAvatar) {
     if (homeSubscription) supabaseClient.removeChannel(homeSubscription);
 
@@ -461,7 +450,6 @@ function subscribePartnerStatus(friendId) {
         .subscribe();
 }
 
-// TOMBOL KEMBALI
 if (btnBack) {
     btnBack.addEventListener('click', () => {
         history.back();
@@ -566,7 +554,6 @@ function appendMessage(msg) {
         </div>
     `;
 
-    // Swipe to Reply
     let startX = 0;
     div.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; });
     div.addEventListener('touchmove', (e) => {
@@ -581,7 +568,6 @@ function appendMessage(msg) {
         }
     });
 
-    // Long Press Menu
     let pressTimer;
     div.addEventListener('mousedown', () => { pressTimer = setTimeout(() => openMessageOptions(msg), 600); });
     div.addEventListener('mouseup', () => clearTimeout(pressTimer));
@@ -733,7 +719,6 @@ function subscribeHomeRealtime() {
         .subscribe();
 }
 
-// DETEKSI VISIBILITAS TAB UNTUK STATUS ONLINE / OFFLINE SECARA REALTIME
 document.addEventListener("visibilitychange", async () => {
     if (!currentUserId) return;
 

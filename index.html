@@ -20,38 +20,38 @@
         .auth-link { color: #007bff; background: none; border: none; font-size: 13px; cursor: pointer; text-align: center; margin-top: 10px; }
         .error-msg { color: #dc3545; font-size: 12px; text-align: center; }
 
-        /* Header & Kontak */
-        .app-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; background: #fff; border-bottom: 1px solid #eee; }
+        /* Home & Header */
+        .app-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #f8f9fa; border-bottom: 1px solid #e9ecef; }
         .user-info { display: flex; align-items: center; gap: 10px; cursor: pointer; }
-        .avatar { width: 36px; height: 36px; border-radius: 50%; background: #ccc; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: bold; overflow: hidden; font-size: 14px; }
+        .avatar { width: 40px; height: 40px; border-radius: 50%; background: #007bff; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: bold; overflow: hidden; font-size: 16px; }
         .avatar img { width: 100%; height: 100%; object-fit: cover; }
         
         .friends-list { flex: 1; overflow-y: auto; background: #fff; }
-        .friend-item { display: flex; align-items: center; padding: 12px 16px; gap: 12px; border-bottom: 1px solid #f8f9fa; cursor: pointer; transition: background 0.2s; }
-        .friend-item:active { background: #f1f3f5; }
+        .friend-item { display: flex; align-items: center; padding: 12px 16px; gap: 12px; border-bottom: 1px solid #f1f3f5; cursor: pointer; transition: background 0.2s; }
+        .friend-item:active { background: #f8f9fa; }
         .friend-info { flex: 1; min-width: 0; }
         .friend-top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-        .friend-name { font-weight: 600; font-size: 14px; color: #111; }
-        .friend-time { font-size: 11px; color: #888; }
+        .friend-name { font-weight: 600; font-size: 14px; color: #212529; }
+        .friend-time { font-size: 11px; color: #adb5bd; }
         .friend-bottom-row { display: flex; justify-content: space-between; align-items: center; }
-        .friend-last-msg { font-size: 13px; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 250px; }
-        .unread-badge { background: #28a745; color: white; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 10px; min-width: 16px; text-align: center; }
-        .friend-item.unread .friend-last-msg { font-weight: 600; color: #111; }
+        .friend-last-msg { font-size: 13px; color: #6c757d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 250px; }
+        .unread-badge { background: #28a745; color: white; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 10px; min-width: 18px; text-align: center; }
+        .friend-item.unread .friend-last-msg { font-weight: 600; color: #212529; }
 
-        /* Halaman Profil (Semua Tombol Ditata Simpel di Bawah) */
-        .profile-header { display: flex; align-items: center; padding: 16px; gap: 16px; border-bottom: 1px solid #eee; }
+        /* Profile Screen */
+        .profile-header { display: flex; align-items: center; padding: 14px 16px; gap: 16px; background: #f8f9fa; border-bottom: 1px solid #e9ecef; }
         .profile-header button { background: none; border: none; font-size: 20px; cursor: pointer; }
         .profile-body { padding: 30px 20px; display: flex; flex-direction: column; align-items: center; gap: 16px; flex: 1; overflow-y: auto; }
-        .profile-avatar-large { width: 90px; height: 90px; border-radius: 50%; background: #ccc; display: flex; align-items: center; justify-content: center; color: white; font-size: 32px; font-weight: bold; overflow: hidden; }
+        .profile-avatar-large { width: 90px; height: 90px; border-radius: 50%; background: #007bff; display: flex; align-items: center; justify-content: center; color: white; font-size: 32px; font-weight: bold; overflow: hidden; }
         .profile-avatar-large img { width: 100%; height: 100%; object-fit: cover; }
-        .btn-secondary { background: #e4e6eb; color: #050505; border: none; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; }
+        .btn-secondary { background: #e9ecef; color: #495057; border: none; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; }
 
-        /* Ruang Chat */
-        .chat-header { display: flex; align-items: center; padding: 10px 16px; background: #fff; border-bottom: 1px solid #eee; gap: 12px; }
+        /* Chat Screen */
+        .chat-header { display: flex; align-items: center; padding: 10px 16px; background: #f8f9fa; border-bottom: 1px solid #e9ecef; gap: 12px; }
         .chat-header button { background: none; border: none; font-size: 20px; cursor: pointer; }
         .chat-partner-info { display: flex; flex-direction: column; }
         .chat-partner-name { font-weight: 600; font-size: 15px; }
-        .chat-status { font-size: 11px; color: #888; }
+        .chat-status { font-size: 11px; color: #6c757d; }
         
         .chat-messages { flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; background: #efeae2; }
         .message-wrapper { display: flex; flex-direction: column; width: 100%; transition: transform 0.2s ease; }
@@ -63,8 +63,8 @@
         .message-item.incoming { background: #fff; border-top-left-radius: 0; }
         
         .msg-footer { display: flex; justify-content: flex-end; align-items: center; gap: 4px; margin-top: 2px; }
-        .msg-time { font-size: 10px; color: #888; }
-        .msg-status { font-size: 10px; color: #888; font-weight: bold; }
+        .msg-time { font-size: 10px; color: #999; }
+        .msg-status { font-size: 10px; color: #999; font-weight: bold; }
         .msg-status.read { color: #53bdeb; }
 
         .quoted-msg { background: rgba(0,0,0,0.05); padding: 4px 8px; border-left: 3px solid #007bff; border-radius: 4px; font-size: 12px; margin-bottom: 4px; }
@@ -78,7 +78,7 @@
         .chat-input-row input { flex: 1; padding: 10px 14px; border: none; border-radius: 20px; outline: none; font-size: 14px; background: #fff; }
         .chat-input-row button { background: #007bff; color: white; border: none; width: 38px; height: 38px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 
-        /* Modal Aksi Pesan */
+        /* Modal */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: flex-end; z-index: 100; }
         .modal.active { display: flex; }
         .modal-content { background: white; width: 100%; max-width: 480px; border-top-left-radius: 16px; border-top-right-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
@@ -86,12 +86,11 @@
         .modal-btn:hover { background: #f1f3f5; }
         .modal-btn.danger { color: #dc3545; }
     </style>
-    <!-- Supabase CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
-    <!-- SCREEN: LOGIN -->
+    <!-- LOGIN SCREEN -->
     <div id="login-screen" class="screen">
         <div class="auth-container">
             <h2>Masuk</h2>
@@ -103,7 +102,7 @@
         </div>
     </div>
 
-    <!-- SCREEN: REGISTER -->
+    <!-- REGISTER SCREEN -->
     <div id="register-screen" class="screen">
         <div class="auth-container">
             <h2>Daftar Akun</h2>
@@ -116,7 +115,7 @@
         </div>
     </div>
 
-    <!-- SCREEN: HOME / DAFTAR KONTAK -->
+    <!-- HOME SCREEN -->
     <div id="home-screen" class="screen">
         <div class="app-header">
             <div id="btn-open-profile" class="user-info">
@@ -124,12 +123,10 @@
                 <span id="my-profile-name" style="font-weight: 600; font-size: 15px;">@User</span>
             </div>
         </div>
-        <div id="friends-list" class="friends-list">
-            <!-- Daftar Kontak Dirender Dinamis -->
-        </div>
+        <div id="friends-list" class="friends-list"></div>
     </div>
 
-    <!-- SCREEN: HALAMAN PROFIL & MENU BAWAH (Add Friend & Logout) -->
+    <!-- PROFILE SCREEN (Menu Bawah: Add Friend & Logout) -->
     <div id="profile-screen" class="screen">
         <div class="profile-header">
             <button id="btn-back-profile">←</button>
@@ -142,25 +139,25 @@
             <input type="file" id="avatar-file-input" accept="image/*" style="display:none;" />
             <p id="profile-status" style="font-size: 13px; margin-top: 5px;"></p>
             
-            <div style="width: 100%; max-width: 320px; display: flex; flex-direction: column; gap: 14px; margin-top: 10px;">
-                <div style="font-size: 14px; font-weight: 500; color: #555; text-align: center;">
-                    Akun: <span id="profile-display-username" style="font-weight: bold; color: #111;"></span>
+            <div style="width: 100%; max-width: 320px; display: flex; flex-direction: column; gap: 14px; margin-top: 15px;">
+                <div style="font-size: 14px; font-weight: 500; color: #495057; text-align: center;">
+                    Akun: <span id="profile-display-username" style="font-weight: bold; color: #212529;"></span>
                 </div>
 
-                <!-- Menu Tambah Teman -->
+                <!-- Tambah Teman -->
                 <div style="display: flex; gap: 8px;">
-                    <input type="text" id="friend-username-input" placeholder="Username teman..." style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; outline: none;">
+                    <input type="text" id="friend-username-input" placeholder="Cari username teman..." style="flex: 1; padding: 10px; border: 1px solid #ced4da; border-radius: 6px; font-size: 13px; outline: none;">
                     <button id="btn-add-friend" class="btn-primary" style="padding: 10px 14px; font-size: 13px;">Tambah</button>
                 </div>
                 <p id="home-error" style="color: #dc3545; font-size: 12px; text-align: center; margin: 0;"></p>
 
-                <!-- Tombol Keluar (Logout) -->
+                <!-- Tombol Keluar / Logout -->
                 <button id="btn-logout" style="margin-top: 20px; padding: 12px; background: #dc3545; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; font-size: 14px;">Keluar (Logout)</button>
             </div>
         </div>
     </div>
 
-    <!-- SCREEN: RUANG CHAT -->
+    <!-- CHAT SCREEN -->
     <div id="chat-screen" class="screen">
         <div class="chat-header">
             <button id="btn-back">←</button>
@@ -171,9 +168,7 @@
             </div>
         </div>
         
-        <div id="chat-messages" class="chat-messages">
-            <!-- Pesan Chat -->
-        </div>
+        <div id="chat-messages" class="chat-messages"></div>
 
         <div class="chat-input-area">
             <div id="reply-preview-box" class="reply-preview-container">
@@ -190,7 +185,7 @@
         </div>
     </div>
 
-    <!-- MODAL AKSI PESAN -->
+    <!-- MODAL -->
     <div id="message-options-modal" class="modal">
         <div class="modal-content">
             <button id="opt-reply" class="modal-btn">Balas Pesan</button>
