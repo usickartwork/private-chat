@@ -314,6 +314,20 @@ input[type="text"]:focus, input[type="password"]:focus {
     to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+.message-wrapper {
+    display: flex;
+    width: 100%;
+    transition: transform 0.2s ease;
+}
+
+.message-wrapper.outgoing {
+    justify-content: flex-end;
+}
+
+.message-wrapper.incoming {
+    justify-content: flex-start;
+}
+
 .message-item {
     max-width: 75%;
     padding: 10px 14px;
@@ -323,20 +337,17 @@ input[type="text"]:focus, input[type="password"]:focus {
     display: flex;
     flex-direction: column;
     animation: messageAppear 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    cursor: pointer;
+    user-select: none;
 }
 
 .message-item.incoming {
     background: #ffffff;
-    align-self: flex-start;
     border: 1px solid #e1e4e8;
     color: #111;
 }
 
-/* WARNA BIRU MODERN UNTUK PENGIRIM */
 .message-item.outgoing {
     background: #0084ff;
-    align-self: flex-end;
     color: white;
 }
 
@@ -353,7 +364,6 @@ input[type="text"]:focus, input[type="password"]:focus {
     font-size: 14px;
 }
 
-/* STYLE KUTIPAN REPLY DALAM GELEMBUNG PESAN */
 .quoted-msg {
     background: rgba(0, 0, 0, 0.06);
     border-left: 3px solid #007bff;
@@ -403,7 +413,7 @@ input[type="text"]:focus, input[type="password"]:focus {
     color: #027eb5;
 }
 
-/* CONTAINER INPUT & PANEL REPLY PREVIEW */
+/* INPUT & REPLY BOX */
 .chat-input-container {
     display: flex;
     flex-direction: column;
@@ -471,6 +481,59 @@ input[type="text"]:focus, input[type="password"]:focus {
     cursor: pointer;
 }
 
-.btn-send:hover {
-    background: #006dd9;
+/* MODAL OPSI PESAN */
+.modal-backdrop {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 1000;
+    justify-content: center;
+    align-items: flex-end;
+}
+
+.modal-backdrop.active {
+    display: flex;
+}
+
+.modal-content {
+    background: white;
+    width: 100%;
+    max-width: 480px;
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    animation: slideUp 0.2s ease;
+}
+
+@keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+}
+
+.modal-content button {
+    padding: 14px;
+    border: none;
+    background: #f8f9fa;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+}
+
+.modal-content button:hover {
+    background: #e9ecef;
+}
+
+.modal-content button.danger-text {
+    color: #dc3545;
+}
+
+.modal-content button.cancel-btn {
+    background: transparent;
+    color: #666;
 }

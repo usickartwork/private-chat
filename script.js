@@ -10,7 +10,8 @@ let currentUserId = localStorage.getItem('chat_user_id') || null;
 let currentUsername = localStorage.getItem('chat_username') || null;
 let activeFriendId = null;
 let activeFriendName = null;
-let replyingToMessageId = null; // Menyimpan ID pesan yang sedang dibalas
+let replyingToMessageId = null;
+let selectedMessageForAction = null; // Menyimpan pesan yang sedang dipilih untuk menu opsi
 
 let chatSubscription = null;
 let homeSubscription = null;
@@ -21,14 +22,12 @@ const registerScreen = document.getElementById('register-screen');
 const homeScreen = document.getElementById('home-screen');
 const chatScreen = document.getElementById('chat-screen');
 
-// Login Elements
 const loginUsernameInput = document.getElementById('login-username');
 const loginPasswordInput = document.getElementById('login-password');
 const btnLogin = document.getElementById('btn-login');
 const loginError = document.getElementById('login-error');
 const toRegisterBtn = document.getElementById('to-register');
 
-// Register Elements
 const regUsernameInput = document.getElementById('reg-username');
 const regPasswordInput = document.getElementById('reg-password');
 const regConfirmPasswordInput = document.getElementById('reg-confirm-password');
@@ -36,7 +35,6 @@ const btnRegister = document.getElementById('btn-register');
 const regError = document.getElementById('reg-error');
 const toLoginBtn = document.getElementById('to-login');
 
-// Home & Chat Elements
 const myProfileName = document.getElementById('my-profile-name');
 const btnLogout = document.getElementById('btn-logout');
 const friendUsernameInput = document.getElementById('friend-username-input');
@@ -50,43 +48,30 @@ const chatMessages = document.getElementById('chat-messages');
 const messageInput = document.getElementById('message-input');
 const btnSend = document.getElementById('btn-send');
 
-// Reply Preview Elements
 const replyPreviewBox = document.getElementById('reply-preview-box');
 const replyingToUser = document.getElementById('replying-to-user');
 const replyingToText = document.getElementById('replying-to-text');
 const btnCancelReply = document.getElementById('btn-cancel-reply');
 
-// Cache untuk menyimpan data pesan agar mudah diakses saat ditampilkan kutipannya
+// Modal Options Elements
+const messageOptionsModal = document.getElementById('message-options-modal');
+const optReply = document.getElementById('opt-reply');
+const optDeleteMe = document.getElementById('opt-delete-me');
+const optDeleteAll = document.getElementById('opt-delete-all');
+const optCancel = document.getElementById('opt-cancel');
+
 let messageCache = {};
 
-// AUTO-LOGIN CHECK
 window.addEventListener('DOMContentLoaded', async () => {
     if (currentUserId && currentUsername) {
-        const { data } = await supabaseClient
-            .from('profiles')
-            .select('*')
-            .eq('id', currentUserId)
-            .single();
-
-        if (data) {
-            showHomeScreen();
-        } else {
-            clearLocalStorage();
-        }
+        const { data } = await supabaseClient.from('profiles').select('*').eq('id', currentUserId).single();
+        if (data) showHomeScreen();
+        else clearLocalStorage();
     }
 });
 
-toRegisterBtn.addEventListener('click', () => {
-    loginScreen.classList.remove('active');
-    registerScreen.classList.add('active');
-    loginError.textContent = '';
-});
-
-toLoginBtn.addEventListener('click', () => {
-    registerScreen.classList.remove('active');
-    loginScreen.classList.add('active');
-    regError.textContent = '';
-});
+toRegisterBtn.addEventListener('click', () => { loginScreen.classList.remove('active'); registerScreen.classList.add('active'); });
+toLoginBtn.addEventListener('click', () => { registerScreen.classList.remove('active'); loginScreen.classList.add('active'); });
 
 // REGISTER
 btnRegister.addEventListener('click', async () => {
@@ -94,35 +79,15 @@ btnRegister.addEventListener('click', async () => {
     const password = regPasswordInput.value.trim();
     const confirmPassword = regConfirmPasswordInput.value.trim();
 
-    if (!username || !password || !confirmPassword) {
-        regError.textContent = 'Semua kolom wajib diisi!';
-        return;
-    }
-    if (password !== confirmPassword) {
-        regError.textContent = 'Konfirmasi password tidak cocok!';
-        return;
-    }
+    if (!username || !password || !confirmPassword) { regError.textContent = 'Semua kolom wajib diisi!'; return; }
+    if (password !== confirmPassword) { regError.textContent = 'Konfirmasi password tidak cocok!'; return; }
     regError.textContent = '';
 
-    const { data: existingUser } = await supabaseClient
-        .from('profiles')
-        .select('*')
-        .eq('username', username)
-        .single();
+    const { data: existingUser } = await supabaseClient.from('profiles').select('*').eq('username', username).single();
+    if (existingUser) { regError.textContent = 'Username sudah dipakai orang lain!'; return; }
 
-    if (existingUser) {
-        regError.textContent = 'Username sudah dipakai orang lain!';
-        return;
-    }
-
-    const { error: insertError } = await supabaseClient
-        .from('profiles')
-        .insert([{ username: username, password: password }]);
-
-    if (insertError) {
-        regError.textContent = 'Gagal mendaftar. Coba lagi.';
-        return;
-    }
+    const { error: insertError } = await supabaseClient.from('profiles').insert([{ username, password }]);
+    if (insertError) { regError.textContent = 'Gagal mendaftar.'; return; }
 
     alert('Akun berhasil dibuat! Silakan masuk.');
     registerScreen.classList.remove('active');
@@ -134,22 +99,11 @@ btnLogin.addEventListener('click', async () => {
     const username = loginUsernameInput.value.trim().toLowerCase();
     const password = loginPasswordInput.value.trim();
 
-    if (!username || !password) {
-        loginError.textContent = 'Masukkan username dan password!';
-        return;
-    }
+    if (!username || !password) { loginError.textContent = 'Masukkan username & password!'; return; }
     loginError.textContent = '';
 
-    const { data: user, error } = await supabaseClient
-        .from('profiles')
-        .select('*')
-        .eq('username', username)
-        .single();
-
-    if (error || !user || user.password !== password) {
-        loginError.textContent = 'Username atau password salah!';
-        return;
-    }
+    const { data: user, error } = await supabaseClient.from('profiles').select('*').eq('username', username).single();
+    if (error || !user || user.password !== password) { loginError.textContent = 'Username atau password salah!'; return; }
 
     currentUserId = user.id;
     currentUsername = user.username;
@@ -171,54 +125,30 @@ function showHomeScreen() {
 btnAddFriend.addEventListener('click', async () => {
     const targetUsername = friendUsernameInput.value.trim().toLowerCase();
     if (!targetUsername) return;
-    if (targetUsername === currentUsername) {
-        homeError.textContent = 'Tidak bisa menambahkan diri sendiri!';
-        return;
-    }
+    if (targetUsername === currentUsername) { homeError.textContent = 'Tidak bisa menambahkan diri sendiri!'; return; }
     homeError.textContent = '';
 
-    const { data: targetUser, error: searchError } = await supabaseClient
-        .from('profiles')
-        .select('*')
-        .eq('username', targetUsername)
-        .single();
+    const { data: targetUser, error: searchError } = await supabaseClient.from('profiles').select('*').eq('username', targetUsername).single();
+    if (searchError || !targetUser) { homeError.textContent = 'Username tidak ditemukan!'; return; }
 
-    if (searchError || !targetUser) {
-        homeError.textContent = 'Username tidak ditemukan!';
-        return;
-    }
-
-    await supabaseClient
-        .from('friendships')
-        .insert([
-            { user_id: currentUserId, friend_id: targetUser.id },
-            { user_id: targetUser.id, friend_id: currentUserId }
-        ]);
-
+    await supabaseClient.from('friendships').insert([
+        { user_id: currentUserId, friend_id: targetUser.id },
+        { user_id: targetUser.id, friend_id: currentUserId }
+    ]);
     friendUsernameInput.value = '';
     loadFriends(true);
 });
 
 // MUAT DAFTAR TEMAN
 async function loadFriends(isInitial = false) {
-    const { data: friendships, error } = await supabaseClient
-        .from('friendships')
-        .select('friend_id')
-        .eq('user_id', currentUserId);
-
-    if (error || !friendships || friendships.length === 0) {
-        if (isInitial) {
-            friendsList.innerHTML = '<p style="padding: 20px; text-align: center; color: #888; font-size: 13px;">Belum ada teman.</p>';
-        }
+    const { data: friendships } = await supabaseClient.from('friendships').select('friend_id').eq('user_id', currentUserId);
+    if (!friendships || friendships.length === 0) {
+        if (isInitial) friendsList.innerHTML = '<p style="padding: 20px; text-align: center; color: #888; font-size: 13px;">Belum ada teman.</p>';
         return;
     }
 
     const friendIds = friendships.map(f => f.friend_id);
-    const { data: friendsProfiles } = await supabaseClient
-        .from('profiles')
-        .select('*')
-        .in('id', friendIds);
-
+    const { data: friendsProfiles } = await supabaseClient.from('profiles').select('*').in('id', friendIds);
     if (!friendsProfiles) return;
     if (isInitial) friendsList.innerHTML = '';
 
@@ -243,8 +173,12 @@ async function loadFriends(isInitial = false) {
 
         if (lastMsgs && lastMsgs.length > 0) {
             const msg = lastMsgs[0];
-            const prefix = msg.sender_id === currentUserId ? 'Kamu: ' : '';
-            lastMsgText = prefix + msg.message;
+            if (msg.is_deleted_for_all) {
+                lastMsgText = 'Pesan telah dihapus';
+            } else {
+                const prefix = msg.sender_id === currentUserId ? 'Kamu: ' : '';
+                lastMsgText = prefix + msg.message;
+            }
             const msgDate = new Date(msg.created_at);
             const today = new Date();
             timeStr = msgDate.toDateString() === today.toDateString() 
@@ -281,7 +215,7 @@ async function loadFriends(isInitial = false) {
     }
 }
 
-// BUKA CHAT ROOM
+// BUKA RUANG CHAT
 async function openChatRoom(friendId, friendName) {
     if (homeSubscription) supabaseClient.removeChannel(homeSubscription);
 
@@ -311,6 +245,9 @@ async function loadMessages() {
     if (!error && messages) {
         messages.forEach(msg => {
             messageCache[msg.id] = msg;
+            // Sembunyikan jika dihapus untuk user ini sendiri
+            if (msg.sender_id === currentUserId && msg.deleted_for_sender) return;
+            if (msg.receiver_id === currentUserId && msg.deleted_for_receiver) return;
             appendMessage(msg);
         });
     }
@@ -327,7 +264,10 @@ async function markMessagesAsRead() {
 
 function appendMessage(msg) {
     messageCache[msg.id] = msg;
-    let msgEl = document.getElementById(`msg-${msg.id}`);
+    if (msg.sender_id === currentUserId && msg.deleted_for_sender) return;
+    if (msg.receiver_id === currentUserId && msg.deleted_for_receiver) return;
+
+    let wrapperEl = document.getElementById(`msg-wrap-${msg.id}`);
     const isOutgoing = msg.sender_id === currentUserId;
     const timeStr = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     
@@ -336,30 +276,39 @@ function appendMessage(msg) {
         statusIcon = `<span class="msg-status ${msg.status === 'read' ? 'read' : ''}">${msg.status === 'read' ? '✓✓' : '✓'}</span>`;
     }
 
-    // Render Quoted Reply jika pesan ini membalas pesan lain
+    let displayContent = escapeHtml(msg.message);
+    if (msg.is_deleted_for_all) {
+        displayContent = '<em style="color: #888;">Pesan ini telah dihapus</em>';
+    }
+
     let replyHtml = '';
-    if (msg.reply_to && messageCache[msg.reply_to]) {
+    if (!msg.is_deleted_for_all && msg.reply_to && messageCache[msg.reply_to]) {
         const repliedMsg = messageCache[msg.reply_to];
         const repliedSender = repliedMsg.sender_id === currentUserId ? 'Kamu' : `@${activeFriendName}`;
         replyHtml = `
             <div class="quoted-msg">
                 <span class="quoted-sender">${repliedSender}</span>
-                <span>${escapeHtml(repliedMsg.message)}</span>
+                <span>${repliedMsg.is_deleted_for_all ? 'Pesan telah dihapus' : escapeHtml(repliedMsg.message)}</span>
             </div>
         `;
     }
 
-    if (msgEl) {
-        const footerEl = msgEl.querySelector('.msg-footer');
-        if (footerEl && isOutgoing) {
-            let existingStatusEl = footerEl.querySelector('.msg-status');
-            if (existingStatusEl) {
-                existingStatusEl.className = `msg-status ${msg.status === 'read' ? 'read' : ''}`;
-                existingStatusEl.textContent = msg.status === 'read' ? '✓✓' : '✓';
-            }
-        }
+    if (wrapperEl) {
+        const msgItem = wrapperEl.querySelector('.message-item');
+        msgItem.innerHTML = `
+            ${replyHtml}
+            <span class="msg-text">${displayContent}</span>
+            <div class="msg-footer">
+                <span class="msg-time">${timeStr}</span>
+                ${statusIcon}
+            </div>
+        `;
         return;
     }
+
+    const wrapper = document.createElement('div');
+    wrapper.id = `msg-wrap-${msg.id}`;
+    wrapper.className = `message-wrapper ${isOutgoing ? 'outgoing' : 'incoming'}`;
 
     const div = document.createElement('div');
     div.id = `msg-${msg.id}`;
@@ -367,23 +316,88 @@ function appendMessage(msg) {
 
     div.innerHTML = `
         ${replyHtml}
-        <span class="msg-text">${escapeHtml(msg.message)}</span>
+        <span class="msg-text">${displayContent}</span>
         <div class="msg-footer">
             <span class="msg-time">${timeStr}</span>
             ${statusIcon}
         </div>
     `;
 
-    // Klik pesan untuk memicu fitur reply
-    div.addEventListener('click', () => {
-        triggerReply(msg.id, isOutgoing ? 'Kamu' : `@${activeFriendName}`, msg.message);
+    // FITUR SWIPE TO REPLY (Geser ke Kanan)
+    let startX = 0;
+    div.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; });
+    div.addEventListener('touchmove', (e) => {
+        let diff = e.touches[0].clientX - startX;
+        if (diff > 0 && diff < 100) {
+            wrapper.style.transform = `translateX(${diff}px)`;
+        }
+    });
+    div.addEventListener('touchend', (e) => {
+        let diff = e.changedTouches[0].clientX - startX;
+        wrapper.style.transform = `translateX(0px)`;
+        if (diff > 60 && !msg.is_deleted_for_all) {
+            triggerReply(msg.id, isOutgoing ? 'Kamu' : `@${activeFriendName}`, msg.message);
+        }
     });
 
-    chatMessages.appendChild(div);
+    // FITUR LONG PRESS (Tekan Tahan untuk Menu Opsi)
+    let pressTimer;
+    div.addEventListener('mousedown', () => { pressTimer = setTimeout(() => openMessageOptions(msg), 600); });
+    div.addEventListener('mouseup', () => clearTimeout(pressTimer));
+    div.addEventListener('touchstart', () => { pressTimer = setTimeout(() => openMessageOptions(msg), 600); });
+    div.addEventListener('touchend', () => clearTimeout(pressTimer));
+
+    wrapper.appendChild(div);
+    chatMessages.appendChild(wrapper);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-// Trigger aktifkan preview balasan
+// BUKA MODAL OPSI PESAN
+function openMessageOptions(msg) {
+    selectedMessageForAction = msg;
+    if (msg.is_deleted_for_all) return; // Jangan tampilkan opsi jika sudah dihapus
+
+    // Sembunyikan opsi "Hapus untuk Semua Orang" jika bukan pesan yang dikirim sendiri
+    if (msg.sender_id !== currentUserId) {
+        optDeleteAll.style.display = 'none';
+    } else {
+        optDeleteAll.style.display = 'block';
+    }
+
+    messageOptionsModal.classList.add('active');
+}
+
+optCancel.addEventListener('click', () => { messageOptionsModal.classList.remove('active'); });
+
+optReply.addEventListener('click', () => {
+    messageOptionsModal.classList.remove('active');
+    const msg = selectedMessageForAction;
+    const isOutgoing = msg.sender_id === currentUserId;
+    triggerReply(msg.id, isOutgoing ? 'Kamu' : `@${activeFriendName}`, msg.message);
+});
+
+// HAPUS UNTUK SAYA (DI PREVIEW / TAMPILAN SENDIRI)
+optDeleteMe.addEventListener('click', async () => {
+    messageOptionsModal.classList.remove('active');
+    const msg = selectedMessageForAction;
+    const isSender = msg.sender_id === currentUserId;
+
+    const updateField = isSender ? { deleted_for_sender: true } : { deleted_for_receiver: true };
+    await supabaseClient.from('messages').update(updateField).eq('id', msg.id);
+
+    const el = document.getElementById(`msg-wrap-${msg.id}`);
+    if (el) el.remove();
+});
+
+// HAPUS UNTUK SEMUA ORANG
+optDeleteAll.addEventListener('click', async () => {
+    messageOptionsModal.classList.remove('active');
+    const msg = selectedMessageForAction;
+
+    await supabaseClient.from('messages').update({ is_deleted_for_all: true, message: '' }).eq('id', msg.id);
+});
+
+// TRIGGER REPLY
 function triggerReply(msgId, senderLabel, text) {
     replyingToMessageId = msgId;
     replyingToUser.textContent = `Membalas ke ${senderLabel}`;
@@ -392,7 +406,6 @@ function triggerReply(msgId, senderLabel, text) {
     messageInput.focus();
 }
 
-// Batalkan reply
 function cancelReply() {
     replyingToMessageId = null;
     replyPreviewBox.classList.remove('active');
@@ -413,27 +426,17 @@ async function sendMessage() {
     messageInput.value = '';
     cancelReply();
 
-    const { error } = await supabaseClient
-        .from('messages')
-        .insert([{
-            sender_id: currentUserId,
-            receiver_id: activeFriendId,
-            message: text,
-            status: 'sent',
-            reply_to: replyId || null
-        }]);
-
-    if (error) {
-        console.error("Gagal mengirim pesan:", error);
-    }
+    await supabaseClient.from('messages').insert([{
+        sender_id: currentUserId,
+        receiver_id: activeFriendId,
+        message: text,
+        status: 'sent',
+        reply_to: replyId || null
+    }]);
 }
 
 btnSend.addEventListener('click', sendMessage);
-messageInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        sendMessage();
-    }
-});
+messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
 
 // REALTIME CHAT
 function subscribeToRealtime() {
@@ -452,10 +455,7 @@ function subscribeToRealtime() {
                 ) {
                     appendMessage(msg);
                     if (msg.sender_id === activeFriendId && msg.receiver_id === currentUserId) {
-                        await supabaseClient
-                            .from('messages')
-                            .update({ status: 'read' })
-                            .eq('id', msg.id);
+                        await supabaseClient.from('messages').update({ status: 'read' }).eq('id', msg.id);
                     }
                 }
             }
@@ -480,9 +480,7 @@ function subscribeHomeRealtime() {
     homeSubscription = supabaseClient
         .channel(`home-${currentUserId}`)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${currentUserId}` }, () => {
-            if (homeScreen.classList.contains('active')) {
-                loadFriends(false);
-            }
+            if (homeScreen.classList.contains('active')) loadFriends(false);
         })
         .subscribe();
 }

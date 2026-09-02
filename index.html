@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Private Chat - Blue & Reply</title>
+    <title>Private Chat - Advanced</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -73,7 +73,7 @@
         <div id="friends-list" class="friends-list"></div>
     </div>
 
-    <!-- 4. SCREEN: CHAT ROOM (DENGAN FITUR REPLY) -->
+    <!-- 4. SCREEN: CHAT ROOM -->
     <div id="chat-screen" class="screen">
         <div class="chat-header">
             <button id="btn-back" class="btn-icon">←</button>
@@ -90,7 +90,7 @@
             <div id="reply-preview-box" class="reply-preview-box">
                 <div class="reply-preview-content">
                     <strong id="replying-to-user">Membalas...</strong>
-                    <span id="replying-to-text">Pesanan...</span>
+                    <span id="replying-to-text">Pesan...</span>
                 </div>
                 <button id="btn-cancel-reply" class="btn-cancel-reply">✕</button>
             </div>
@@ -98,6 +98,16 @@
                 <input type="text" id="message-input" placeholder="Ketik pesan..." autocomplete="off">
                 <button id="btn-send" class="btn-send">Kirim</button>
             </div>
+        </div>
+    </div>
+
+    <!-- MODAL MENU OPSI PESAN (TEKAN TAHAN) -->
+    <div id="message-options-modal" class="modal-backdrop">
+        <div class="modal-content">
+            <button id="opt-reply">Balas (Reply)</button>
+            <button id="opt-delete-me">Hapus untuk Saya</button>
+            <button id="opt-delete-all" class="danger-text">Hapus untuk Semua Orang</button>
+            <button id="opt-cancel" class="cancel-btn">Batal</button>
         </div>
     </div>
 
