@@ -165,12 +165,17 @@ btnLogin.addEventListener('click', async () => {
     currentUsername = user.username;
     currentUserAvatar = user.avatar_url;
     saveLocalStorage();
+    await requestNotificationPermission();
     showHomeScreen(true);
 });
 
 async function requestNotificationPermission() {
     if ('Notification' in window && Notification.permission !== 'granted') {
-        await Notification.requestPermission();
+        try {
+            await Notification.requestPermission();
+        } catch (e) {
+            console.error('Gagal meminta izin notifikasi', e);
+        }
     }
 }
 
@@ -184,7 +189,6 @@ async function showHomeScreen(pushHistory = true) {
     renderAvatar(myHeaderAvatar, currentUserAvatar, currentUsername);
 
     await supabaseClient.from('profiles').update({ is_online: true }).eq('id', currentUserId);
-    requestNotificationPermission();
 
     loadFriends();
     subscribeHomeRealtime();
@@ -530,15 +534,23 @@ async function markMessagesAsRead() {
 }
 
 function showBrowserNotification(senderName, messageText) {
-    if ('Notification' in window && Notification.permission === 'granted' && document.hidden) {
-        navigator.serviceWorker.ready.then(registration => {
-            registration.showNotification(`Pesan baru dari @${senderName}`, {
-                body: messageText,
-                icon: 'https://cdn-icons-png.flaticon.com/512/1041/1041916.png',
-                badge: 'https://cdn-icons-png.flaticon.com/512/1041/1041916.png',
-                vibrate: [200, 100, 200]
+    if ('Notification' in window && Notification.permission === 'granted') {
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.ready.then(registration => {
+                registration.showNotification(`Pesan dari @${senderName}`, {
+                    body: messageText,
+                    icon: 'https://cdn-icons-png.flaticon.com/512/1041/1041916.png',
+                    badge: 'https://cdn-icons-png.flaticon.com/512/1041/1041916.png',
+                    vibrate: [200, 100, 200],
+                    tag: 'chat-notification'
+                });
             });
-        });
+        } else {
+            new Notification(`Pesan dari @${senderName}`, {
+                body: messageText,
+                icon: 'https://cdn-icons-png.flaticon.com/512/1041/1041916.png'
+            });
+        }
     }
 }
 
