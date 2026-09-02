@@ -434,9 +434,9 @@ input[type="text"]:focus, input[type="password"]:focus {
 .chat-input-area {
     display: flex;
     padding: 12px 16px;
-    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 16px));
     gap: 8px;
-    align-items: flex-end; /* Supaya tombol kirim sejajar di bawah saat textarea membesar */
+    align-items: flex-end;
 }
 
 .chat-input-area textarea#message-input {
