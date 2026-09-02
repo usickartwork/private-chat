@@ -2,199 +2,140 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aplikasi Chat Realtime</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-        body { background-color: #f0f2f5; color: #333; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
-        .screen { display: none; width: 100%; max-width: 480px; height: 100%; background: #fff; flex-direction: column; position: relative; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        .screen.active { display: flex; }
-        
-        /* Auth Screens */
-        .auth-container { padding: 40px 24px; display: flex; flex-direction: column; justify-content: center; height: 100%; gap: 16px; }
-        .auth-container h2 { font-size: 24px; margin-bottom: 8px; color: #111; }
-        .auth-container input { padding: 12px 16px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; }
-        .auth-container input:focus { border-color: #007bff; }
-        .btn-primary { background: #007bff; color: #fff; border: none; padding: 12px; border-radius: 8px; font-size: 15px; font-weight: 500; cursor: pointer; }
-        .btn-primary:active { background: #0056b3; }
-        .auth-link { color: #007bff; background: none; border: none; font-size: 13px; cursor: pointer; text-align: center; margin-top: 10px; }
-        .error-msg { color: #dc3545; font-size: 12px; text-align: center; }
-
-        /* Home & Header */
-        .app-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #f8f9fa; border-bottom: 1px solid #e9ecef; }
-        .user-info { display: flex; align-items: center; gap: 10px; cursor: pointer; }
-        .avatar { width: 40px; height: 40px; border-radius: 50%; background: #007bff; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: bold; overflow: hidden; font-size: 16px; }
-        .avatar img { width: 100%; height: 100%; object-fit: cover; }
-        
-        .friends-list { flex: 1; overflow-y: auto; background: #fff; }
-        .friend-item { display: flex; align-items: center; padding: 12px 16px; gap: 12px; border-bottom: 1px solid #f1f3f5; cursor: pointer; transition: background 0.2s; }
-        .friend-item:active { background: #f8f9fa; }
-        .friend-info { flex: 1; min-width: 0; }
-        .friend-top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-        .friend-name { font-weight: 600; font-size: 14px; color: #212529; }
-        .friend-time { font-size: 11px; color: #adb5bd; }
-        .friend-bottom-row { display: flex; justify-content: space-between; align-items: center; }
-        .friend-last-msg { font-size: 13px; color: #6c757d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 250px; }
-        .unread-badge { background: #28a745; color: white; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 10px; min-width: 18px; text-align: center; }
-        .friend-item.unread .friend-last-msg { font-weight: 600; color: #212529; }
-
-        /* Profile Screen */
-        .profile-header { display: flex; align-items: center; padding: 14px 16px; gap: 16px; background: #f8f9fa; border-bottom: 1px solid #e9ecef; }
-        .profile-header button { background: none; border: none; font-size: 20px; cursor: pointer; }
-        .profile-body { padding: 30px 20px; display: flex; flex-direction: column; align-items: center; gap: 16px; flex: 1; overflow-y: auto; }
-        .profile-avatar-large { width: 90px; height: 90px; border-radius: 50%; background: #007bff; display: flex; align-items: center; justify-content: center; color: white; font-size: 32px; font-weight: bold; overflow: hidden; }
-        .profile-avatar-large img { width: 100%; height: 100%; object-fit: cover; }
-        .btn-secondary { background: #e9ecef; color: #495057; border: none; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; }
-
-        /* Chat Screen */
-        .chat-header { display: flex; align-items: center; padding: 10px 16px; background: #f8f9fa; border-bottom: 1px solid #e9ecef; gap: 12px; }
-        .chat-header button { background: none; border: none; font-size: 20px; cursor: pointer; }
-        .chat-partner-info { display: flex; flex-direction: column; }
-        .chat-partner-name { font-weight: 600; font-size: 15px; }
-        .chat-status { font-size: 11px; color: #6c757d; }
-        
-        .chat-messages { flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; background: #efeae2; }
-        .message-wrapper { display: flex; flex-direction: column; width: 100%; transition: transform 0.2s ease; }
-        .message-wrapper.outgoing { align-items: flex-end; }
-        .message-wrapper.incoming { align-items: flex-start; }
-        
-        .message-item { max-width: 75%; padding: 8px 12px; border-radius: 8px; font-size: 14px; position: relative; word-break: break-word; box-shadow: 0 1px 0.5px rgba(0,0,0,0.13); }
-        .message-item.outgoing { background: #d9fdd3; border-top-right-radius: 0; }
-        .message-item.incoming { background: #fff; border-top-left-radius: 0; }
-        
-        .msg-footer { display: flex; justify-content: flex-end; align-items: center; gap: 4px; margin-top: 2px; }
-        .msg-time { font-size: 10px; color: #999; }
-        .msg-status { font-size: 10px; color: #999; font-weight: bold; }
-        .msg-status.read { color: #53bdeb; }
-
-        .quoted-msg { background: rgba(0,0,0,0.05); padding: 4px 8px; border-left: 3px solid #007bff; border-radius: 4px; font-size: 12px; margin-bottom: 4px; }
-        .quoted-sender { font-weight: bold; display: block; font-size: 11px; color: #007bff; }
-
-        .chat-input-area { padding: 10px 16px; background: #f0f2f5; display: flex; flex-direction: column; gap: 6px; }
-        .reply-preview-container { display: none; background: #fff; padding: 6px 12px; border-radius: 6px; border-left: 3px solid #007bff; justify-content: space-between; align-items: center; font-size: 12px; }
-        .reply-preview-container.active { display: flex; }
-        
-        .chat-input-row { display: flex; gap: 8px; align-items: center; }
-        .chat-input-row input { flex: 1; padding: 10px 14px; border: none; border-radius: 20px; outline: none; font-size: 14px; background: #fff; }
-        .chat-input-row button { background: #007bff; color: white; border: none; width: 38px; height: 38px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-
-        /* Modal */
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: flex-end; z-index: 100; }
-        .modal.active { display: flex; }
-        .modal-content { background: white; width: 100%; max-width: 480px; border-top-left-radius: 16px; border-top-right-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
-        .modal-btn { padding: 12px; text-align: left; background: none; border: none; font-size: 14px; cursor: pointer; border-radius: 6px; }
-        .modal-btn:hover { background: #f1f3f5; }
-        .modal-btn.danger { color: #dc3545; }
-    </style>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Private Chat - Profile & Avatar</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
-    <!-- LOGIN SCREEN -->
-    <div id="login-screen" class="screen">
-        <div class="auth-container">
+    <!-- 1. SCREEN: LOGIN -->
+    <div id="login-screen" class="screen active">
+        <div class="card">
             <h2>Masuk</h2>
-            <input type="text" id="login-username" placeholder="Username">
-            <input type="password" id="login-password" placeholder="Password">
-            <button id="btn-login" class="btn-primary">Masuk</button>
-            <p id="login-error" class="error-msg"></p>
-            <button id="to-register" class="auth-link">Belum punya akun? Daftar</button>
-        </div>
-    </div>
-
-    <!-- REGISTER SCREEN -->
-    <div id="register-screen" class="screen">
-        <div class="auth-container">
-            <h2>Daftar Akun</h2>
-            <input type="text" id="reg-username" placeholder="Username">
-            <input type="password" id="reg-password" placeholder="Password">
-            <input type="password" id="reg-confirm-password" placeholder="Konfirmasi Password">
-            <button id="btn-register" class="btn-primary">Daftar</button>
-            <p id="reg-error" class="error-msg"></p>
-            <button id="to-login" class="auth-link">Sudah punya akun? Masuk</button>
-        </div>
-    </div>
-
-    <!-- HOME SCREEN -->
-    <div id="home-screen" class="screen">
-        <div class="app-header">
-            <div id="btn-open-profile" class="user-info">
-                <div id="my-header-avatar" class="avatar">?</div>
-                <span id="my-profile-name" style="font-weight: 600; font-size: 15px;">@User</span>
+            <p class="subtitle">Silakan masuk dengan akun kamu</p>
+            
+            <div class="form-group">
+                <label for="login-username">Username</label>
+                <input type="text" id="login-username" placeholder="Masukkan username" autocomplete="off">
             </div>
+            <div class="form-group">
+                <label for="login-password">Password</label>
+                <input type="password" id="login-password" placeholder="Masukkan password">
+            </div>
+            <button id="btn-login" class="btn primary">Masuk</button>
+            <p id="login-error" class="error"></p>
+            
+            <p class="switch-auth">Belum punya akun? <span id="to-register">Buat Akun</span></p>
         </div>
+    </div>
+
+    <!-- 2. SCREEN: REGISTER -->
+    <div id="register-screen" class="screen">
+        <div class="card">
+            <h2>Buat Akun</h2>
+            <p class="subtitle">Daftarkan username dan password kamu</p>
+            
+            <div class="form-group">
+                <label for="reg-username">Username</label>
+                <input type="text" id="reg-username" placeholder="Pilih username unik" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label for="reg-password">Password</label>
+                <input type="password" id="reg-password" placeholder="Buat password">
+            </div>
+            <div class="form-group">
+                <label for="reg-confirm-password">Konfirmasi Password</label>
+                <input type="password" id="reg-confirm-password" placeholder="Ulangi password">
+            </div>
+            <button id="btn-register" class="btn primary">Daftar</button>
+            <p id="reg-error" class="error"></p>
+            
+            <p class="switch-auth">Sudah punya akun? <span id="to-login">Masuk</span></p>
+        </div>
+    </div>
+
+    <!-- 3. SCREEN: HOME / CONTACT LIST -->
+    <div id="home-screen" class="screen">
+        <div class="home-header">
+            <div class="my-profile-preview" id="btn-open-profile" style="cursor: pointer; display: flex; align-items: center; gap: 10px;">
+                <div id="my-header-avatar" class="friend-avatar" style="width: 36px; height: 36px; font-size: 14px;">-</div>
+                <div>
+                    <h3 id="my-profile-name" style="font-size: 14px;">Halo, -</h3>
+                    <span style="font-size: 11px; color: #0084ff;">Edit Profil & Foto</span>
+                </div>
+            </div>
+            <button id="btn-logout" class="btn-icon-text">Keluar</button>
+        </div>
+
+        <div class="add-friend-box">
+            <input type="text" id="friend-username-input" placeholder="Cari username teman..." autocomplete="off">
+            <button id="btn-add-friend" class="btn primary">Tambah</button>
+        </div>
+        <p id="home-error" class="error-small"></p>
+
+        <div class="section-title">Daftar Kontak</div>
         <div id="friends-list" class="friends-list"></div>
     </div>
 
-    <!-- PROFILE SCREEN (Menu Bawah: Add Friend & Logout) -->
+    <!-- 4. SCREEN: PROFILE SETTINGS -->
     <div id="profile-screen" class="screen">
-        <div class="profile-header">
-            <button id="btn-back-profile">←</button>
-            <h2>Profil & Pengaturan</h2>
-        </div>
-        <div class="profile-body">
-            <div id="profile-large-avatar" class="profile-avatar-large"></div>
-            <img id="profile-large-img" class="profile-avatar-large" style="display:none;" />
-            <button id="btn-change-photo" class="btn-secondary">Ganti Foto Profil</button>
-            <input type="file" id="avatar-file-input" accept="image/*" style="display:none;" />
-            <p id="profile-status" style="font-size: 13px; margin-top: 5px;"></p>
-            
-            <div style="width: 100%; max-width: 320px; display: flex; flex-direction: column; gap: 14px; margin-top: 15px;">
-                <div style="font-size: 14px; font-weight: 500; color: #495057; text-align: center;">
-                    Akun: <span id="profile-display-username" style="font-weight: bold; color: #212529;"></span>
-                </div>
-
-                <!-- Tambah Teman -->
-                <div style="display: flex; gap: 8px;">
-                    <input type="text" id="friend-username-input" placeholder="Cari username teman..." style="flex: 1; padding: 10px; border: 1px solid #ced4da; border-radius: 6px; font-size: 13px; outline: none;">
-                    <button id="btn-add-friend" class="btn-primary" style="padding: 10px 14px; font-size: 13px;">Tambah</button>
-                </div>
-                <p id="home-error" style="color: #dc3545; font-size: 12px; text-align: center; margin: 0;"></p>
-
-                <!-- Tombol Keluar / Logout -->
-                <button id="btn-logout" style="margin-top: 20px; padding: 12px; background: #dc3545; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; font-size: 14px;">Keluar (Logout)</button>
+        <div class="chat-header">
+            <button id="btn-back-profile" class="btn-icon">←</button>
+            <div class="chat-info">
+                <h3>Pengaturan Profil</h3>
             </div>
+        </div>
+        <div class="card" style="align-items: center; text-align: center; justify-content: flex-start; padding-top: 40px;">
+            <div id="profile-pic-container" style="position: relative; margin-bottom: 20px; cursor: pointer;">
+                <div id="profile-large-avatar" class="friend-avatar" style="width: 90px; height: 90px; font-size: 36px;">-</div>
+                <img id="profile-large-img" style="display: none; width: 90px; height: 90px; border-radius: 50%; object-fit: cover;" />
+            </div>
+            <input type="file" id="avatar-file-input" accept="image/*" style="display: none;">
+            <button id="btn-change-photo" class="btn primary" style="width: auto; padding: 10px 20px; font-size: 14px;">Pilih Foto Profil Baru</button>
+            <p id="profile-status" class="error-small" style="color: #28a745;"></p>
         </div>
     </div>
 
-    <!-- CHAT SCREEN -->
+    <!-- 5. SCREEN: CHAT ROOM -->
     <div id="chat-screen" class="screen">
         <div class="chat-header">
-            <button id="btn-back">←</button>
-            <div id="chat-partner-avatar-container" class="avatar" style="width: 34px; height: 34px; font-size: 13px;">?</div>
-            <div class="chat-partner-info">
-                <span id="chat-partner-name" class="chat-partner-name">@Partner</span>
-                <span id="chat-status-indicator" class="chat-status">Offline</span>
+            <button id="btn-back" class="btn-icon">←</button>
+            <div id="chat-partner-avatar-container" class="friend-avatar" style="width: 38px; height: 38px; font-size: 15px; flex-shrink: 0;">-</div>
+            <div class="chat-info">
+                <div>
+                    <h3 id="chat-partner-name">Nama Teman</h3>
+                    <span id="chat-status-indicator">Online</span>
+                </div>
             </div>
         </div>
-        
+
         <div id="chat-messages" class="chat-messages"></div>
 
-        <div class="chat-input-area">
-            <div id="reply-preview-box" class="reply-preview-container">
-                <div>
-                    <span id="replying-to-user" style="font-weight: bold; color: #007bff;">Membalas</span>
-                    <span id="replying-to-text" style="display: block; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 300px;"></span>
+        <div class="chat-input-container">
+            <div id="reply-preview-box" class="reply-preview-box">
+                <div class="reply-preview-content">
+                    <strong id="replying-to-user">Membalas...</strong>
+                    <span id="replying-to-text">Pesan...</span>
                 </div>
-                <button id="btn-cancel-reply" style="background: none; border: none; font-size: 16px; cursor: pointer; color: #888;">&times;</button>
+                <button id="btn-cancel-reply" class="btn-cancel-reply">✕</button>
             </div>
-            <div class="chat-input-row">
-                <input type="text" id="message-input" placeholder="Ketik pesan...">
-                <button id="btn-send">&#10148;</button>
+            <div class="chat-input-area">
+                <input type="text" id="message-input" placeholder="Ketik pesan..." autocomplete="off">
+                <button id="btn-send" class="btn-send">Kirim</button>
             </div>
         </div>
     </div>
 
-    <!-- MODAL -->
-    <div id="message-options-modal" class="modal">
+    <!-- MODAL OPSI PESAN -->
+    <div id="message-options-modal" class="modal-backdrop">
         <div class="modal-content">
-            <button id="opt-reply" class="modal-btn">Balas Pesan</button>
-            <button id="opt-delete-me" class="modal-btn">Hapus untuk Saya</button>
-            <button id="opt-delete-all" class="modal-btn danger">Hapus untuk Semua</button>
-            <button id="opt-cancel" class="modal-btn" style="text-align: center; color: #666;">Batal</button>
+            <button id="opt-reply">Balas (Reply)</button>
+            <button id="opt-delete-me">Hapus untuk Saya</button>
+            <button id="opt-delete-all" class="danger-text">Hapus untuk Semua Orang</button>
+            <button id="opt-cancel" class="cancel-btn">Batal</button>
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="script.js"></script>
 </body>
 </html>
