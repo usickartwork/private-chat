@@ -137,7 +137,7 @@ function showHomeScreen() {
     chatScreen.classList.remove('active');
     homeScreen.classList.add('active');
     myProfileName.textContent = `@${currentUsername}`;
-    renderAvatar(myHeaderAvatar, null, currentUsername);
+    renderAvatar(myHeaderAvatar, currentUserAvatar, currentUsername);
     loadFriends(true);
     subscribeHomeRealtime();
 }
@@ -178,10 +178,9 @@ avatarFileInput.addEventListener('change', async (e) => {
     profileStatus.textContent = 'Mengunggah foto...';
 
     const fileExt = file.name.split('.').pop();
-    const fileName = `${currentUserId}_${Math.random().toString(36.substring(2))}.${fileExt}`;
+    const fileName = `${currentUserId}_${Math.random().toString(36).substring(2)}.${fileExt}`;
     const filePath = `${fileName}`;
 
-    // Upload ke bucket 'avatars'
     const { error: uploadError } = await supabaseClient.storage
         .from('avatars')
         .upload(filePath, file, { upsert: true });
@@ -192,14 +191,12 @@ avatarFileInput.addEventListener('change', async (e) => {
         return;
     }
 
-    // Ambil Public URL
     const { data: publicUrlData } = supabaseClient.storage
         .from('avatars')
         .getPublicUrl(filePath);
 
     const avatarUrl = publicUrlData.publicUrl;
 
-    // Simpan ke tabel profiles
     const { error: updateError } = await supabaseClient
         .from('profiles')
         .update({ avatar_url: avatarUrl })
@@ -220,7 +217,6 @@ avatarFileInput.addEventListener('change', async (e) => {
     profileStatus.textContent = 'Foto profil berhasil diperbarui!';
 });
 
-// BANTU FUNGSI RENDER AVATAR (GAMBAR ATAU INISIAL)
 function renderAvatar(containerEl, avatarUrl, username, size = '36px') {
     containerEl.style.width = size;
     containerEl.style.height = size;
