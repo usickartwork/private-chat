@@ -249,7 +249,6 @@ async function loadMessages() {
     }
 }
 
-// Tandai pesan dari partner sebagai 'read' saat kita buka room / baca pesan
 async function markMessagesAsRead() {
     await supabaseClient
         .from('messages')
@@ -264,14 +263,12 @@ function appendMessage(msg) {
     const isOutgoing = msg.sender_id === sessionId;
     const timeStr = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     
-    // Status ikon: ✓ (sent) atau ✓✓ (read berwarna biru)
     let statusIcon = '';
     if (isOutgoing) {
         statusIcon = `<span class="msg-status ${msg.status === 'read' ? 'read' : ''}">${msg.status === 'read' ? '✓✓' : '✓'}</span>`;
     }
 
     if (msgEl) {
-        // Jika elemen sudah ada, update statusnya saja jika berubah
         const statusEl = msgEl.querySelector('.msg-status');
         if (statusEl) {
             statusEl.className = `msg-status ${msg.status === 'read' ? 'read' : ''}`;
@@ -351,7 +348,6 @@ function subscribeToRealtime() {
         }, payload => {
             if (payload && payload.new) {
                 appendMessage(payload.new);
-                // Jika pesan baru dari partner, otomatis ubah statusnya jadi read karena kita sedang aktif di room
                 if (payload.new.sender_id !== sessionId) {
                     supabaseClient
                         .from('messages')
@@ -363,10 +359,9 @@ function subscribeToRealtime() {
         .on('postgres_changes', {
             event: 'UPDATE',
             schema: 'public',
-            table: 'messages',
-            filter: `room_id=eq.${currentRoomId}`
+            table: 'messages'
         }, payload => {
-            if (payload && payload.new) {
+            if (payload && payload.new && payload.new.room_id === currentRoomId) {
                 appendMessage(payload.new);
             }
         })
