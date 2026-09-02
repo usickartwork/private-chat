@@ -718,7 +718,7 @@ if (messageInput) {
     messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
 }
 
-// --- LOGIKA MINI GAME TIC-TAC-TOE DENGAN SISTEM ACC, RANDOM SIMBOL & GILIRAN KETAT ---
+// --- LOGIKA MINI GAME TIC-TAC-TOE DENGAN NAMA USERNAME & AUTO CLOSE ---
 if (btnInviteGame) {
     btnInviteGame.addEventListener('click', async () => {
         await supabaseClient.from('messages').insert([{
@@ -816,8 +816,14 @@ function checkGameWinnerLocal() {
         let b = gameState[condition[1]];
         let c = gameState[condition[2]];
         if (a !== '' && a === b && b === c) {
-            gameStatusText.textContent = `🎉 Permainan Selesai! Pemenang: ${a}`;
+            let winnerName = (a === mySymbol) ? `@${currentUsername}` : `@${activeFriendName}`;
+            gameStatusText.textContent = `🎉 Permainan Selesai! Pemenang: ${winnerName} (${a})`;
             gameActive = false;
+            
+            setTimeout(() => {
+                if (gameModal) gameModal.classList.remove('active');
+            }, 3500);
+
             return a;
         }
     }
@@ -825,6 +831,11 @@ function checkGameWinnerLocal() {
     if (!gameState.includes('')) {
         gameStatusText.textContent = `🤝 Permainan Berakhir Seri!`;
         gameActive = false;
+        
+        setTimeout(() => {
+            if (gameModal) gameModal.classList.remove('active');
+        }, 3500);
+
         return 'tie';
     }
     return null;
@@ -846,8 +857,13 @@ function handleIncomingGameMessage(msg) {
                 if (moveData.winner === 'tie') {
                     gameStatusText.textContent = `🤝 Permainan Berakhir Seri!`;
                 } else {
-                    gameStatusText.textContent = `🎉 Permainan Selesai! Pemenang: ${moveData.winner}`;
+                    let winnerName = (moveData.winner === mySymbol) ? `@${currentUsername}` : `@${activeFriendName}`;
+                    gameStatusText.textContent = `🎉 Permainan Selesai! Pemenang: ${winnerName} (${moveData.winner})`;
                 }
+
+                setTimeout(() => {
+                    if (gameModal) gameModal.classList.remove('active');
+                }, 3500);
             } else {
                 if (moveData.symbol !== mySymbol) {
                     isMyTurn = true;
