@@ -59,17 +59,20 @@ window.addEventListener('DOMContentLoaded', async () => {
 
 // Penanganan agar tampilan otomatis menyesuaikan saat keyboard HP muncul/tertutup
 if (window.visualViewport) {
-    let lastHeight = window.visualViewport.height;
     window.visualViewport.addEventListener('resize', () => {
         if (chatScreen.classList.contains('active')) {
-            if (window.visualViewport.height > lastHeight) {
-                window.scrollTo(0, 0);
-            }
-            lastHeight = window.visualViewport.height;
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
     });
 }
+
+// Paksa reset tampilan ketika user batal mengetik / keyboard tertutup (blur)
+messageInput.addEventListener('blur', () => {
+    setTimeout(() => {
+        window.scrollTo(0, 0);
+        document.body.scrollTop = 0;
+    }, 100);
+});
 
 function showError(msg) {
     errorMsg.textContent = msg;
