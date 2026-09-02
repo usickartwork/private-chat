@@ -79,15 +79,30 @@ const optCancel = document.getElementById('opt-cancel');
 let messageCache = {};
 
 window.addEventListener('DOMContentLoaded', async () => {
+    history.replaceState({ screen: 'home' }, '');
+
     if (currentUserId && currentUsername) {
         const { data } = await supabaseClient.from('profiles').select('*').eq('id', currentUserId).single();
         if (data) {
             currentUserAvatar = data.avatar_url;
             saveLocalStorage();
-            showHomeScreen();
+            showHomeScreen(false);
         } else {
             clearLocalStorage();
         }
+    }
+});
+
+// MENDUKUNG GESTURE BACK / TOMBOL BACK DEVICE SECARA HALUS TANPA LOOP
+window.addEventListener('popstate', (event) => {
+    messageOptionsModal.classList.remove('active');
+
+    if (chatScreen.classList.contains('active')) {
+        executeBackToHome();
+    } else if (profileScreen.classList.contains('active')) {
+        profileScreen.classList.remove('active');
+        homeScreen.classList.add('active');
+        loadFriends();
     }
 });
 
@@ -130,10 +145,10 @@ btnLogin.addEventListener('click', async () => {
     currentUsername = user.username;
     currentUserAvatar = user.avatar_url;
     saveLocalStorage();
-    showHomeScreen();
+    showHomeScreen(true);
 });
 
-function showHomeScreen() {
+function showHomeScreen(pushHistory = true) {
     loginScreen.classList.remove('active');
     registerScreen.classList.remove('active');
     profileScreen.classList.remove('active');
@@ -144,9 +159,12 @@ function showHomeScreen() {
     loadFriends();
     subscribeHomeRealtime();
     setupPresence();
+    if (pushHistory) {
+        history.replaceState({ screen: 'home' }, '');
+    }
 }
 
-// SETUP PRESENCE (STATUS ONLINE / OFFLINE)
+// SETUP PRESENCE (STATUS ONLINE / OFFLINE REALTIME)
 function setupPresence() {
     if (presenceChannel) supabaseClient.removeChannel(presenceChannel);
 
@@ -156,28 +174,24 @@ function setupPresence() {
 
     presenceChannel.subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
-            myProfileStatus.textContent = 'Online';
-            myProfileStatus.style.color = '#28a745';
-            await presenceChannel.track({ online_at: new Date().toISOString() });
+            await presenceChannel.track({ user_id: currentUserId, online_at: new Date().toISOString() });
         }
     });
 
     presenceChannel.on('presence', { event: 'sync' }, () => {
         const state = presenceChannel.presenceState();
+        
+        // Cek status partner di chat room
         if (activeFriendId) {
-            updatePartnerStatus(state);
+            if (state[activeFriendId]) {
+                chatStatusIndicator.textContent = 'Online';
+                chatStatusIndicator.style.color = '#28a745';
+            } else {
+                chatStatusIndicator.textContent = 'Offline';
+                chatStatusIndicator.style.color = '#888';
+            }
         }
     });
-}
-
-function updatePartnerStatus(state) {
-    if (state[activeFriendId]) {
-        chatStatusIndicator.textContent = 'Online';
-        chatStatusIndicator.style.color = '#28a745';
-    } else {
-        chatStatusIndicator.textContent = 'Offline';
-        chatStatusIndicator.style.color = '#888';
-    }
 }
 
 // BUKA HALAMAN PROFIL
@@ -186,12 +200,14 @@ btnOpenProfile.addEventListener('click', () => {
     profileScreen.classList.add('active');
     renderProfileAvatar();
     profileStatus.textContent = '';
+    history.pushState({ screen: 'profile' }, '');
 });
 
 btnBackProfile.addEventListener('click', () => {
     profileScreen.classList.remove('active');
     homeScreen.classList.add('active');
     loadFriends();
+    history.replaceState({ screen: 'home' }, '');
 });
 
 function renderProfileAvatar() {
@@ -404,24 +420,24 @@ async function openChatRoom(friendId, friendName, friendAvatar) {
     await loadMessages();
     await markMessagesAsRead();
     subscribeToRealtime();
+
+    history.pushState({ screen: 'chat' }, '');
 }
 
-// TOMBOL KEMBALI DI POJOK KIRI ATAS / GESTURE HP
+// TOMBOL KEMBALI / GESTURE BACK
 btnBack.addEventListener('click', () => {
+    executeBackToHome();
+});
+
+function executeBackToHome() {
     if (chatSubscription) supabaseClient.removeChannel(chatSubscription);
     chatScreen.classList.remove('active');
     homeScreen.classList.add('active');
     activeFriendId = null;
     loadFriends();
     subscribeHomeRealtime();
-    if (presenceChannel) {
-        const state = presenceChannel.presenceState();
-        if (state[currentUserId]) {
-            myProfileStatus.textContent = 'Online';
-            myProfileStatus.style.color = '#28a745';
-        }
-    }
-});
+    history.replaceState({ screen: 'home' }, '');
+}
 
 async function loadMessages() {
     chatMessages.innerHTML = '';
@@ -665,14 +681,13 @@ function subscribeHomeRealtime() {
         .subscribe();
 }
 
+// DETEKSI AKTIF/TIDAKNYA TAB WEB UNTUK STATUS ONLINE SECARA INSTAN
 document.addEventListener("visibilitychange", async () => {
-    if (document.visibilityState === "hidden") {
+    if (document.visibilityState === "visible") {
+        myProfileStatus.textContent = 'Online';
+        myProfileStatus.style.color = '#28a745';
         if (presenceChannel) {
-            await presenceChannel.untrack();
-        }
-    } else if (document.visibilityState === "visible") {
-        if (presenceChannel) {
-            await presenceChannel.track({ online_at: new Date().toISOString() });
+            await presenceChannel.track({ user_id: currentUserId, online_at: new Date().toISOString() });
         }
         if (chatScreen.classList.contains('active') && activeFriendId) {
             await loadMessages();
@@ -681,6 +696,12 @@ document.addEventListener("visibilitychange", async () => {
         } else if (homeScreen.classList.contains('active')) {
             loadFriends();
             subscribeHomeRealtime();
+        }
+    } else {
+        myProfileStatus.textContent = 'Offline';
+        myProfileStatus.style.color = '#888';
+        if (presenceChannel) {
+            await presenceChannel.untrack();
         }
     }
 });
