@@ -551,7 +551,6 @@ function appendMessage(msg) {
         displayContent = '<em style="color: #888;">Pesan ini telah dihapus</em>';
     }
 
-    // Pembuatan elemen tombol ACC secara aman dengan DOM API untuk mencegah error/freeze
     let actionButtonContainer = null;
     if (isGameCard && msg.message.startsWith('[GAME_INVITE]:') && !isOutgoing) {
         actionButtonContainer = document.createElement('div');
@@ -719,7 +718,7 @@ if (messageInput) {
     messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
 }
 
-// --- LOGIKA MINI GAME TIC-TAC-TOE DENGAN SISTEM ACC & RANDOM SIMBOL ---
+// --- LOGIKA MINI GAME TIC-TAC-TOE DENGAN SISTEM ACC, RANDOM SIMBOL & GILIRAN KETAT ---
 if (btnInviteGame) {
     btnInviteGame.addEventListener('click', async () => {
         await supabaseClient.from('messages').insert([{
@@ -785,7 +784,10 @@ function updateBoardUI() {
 gameCells.forEach(cell => {
     cell.addEventListener('click', async () => {
         const index = cell.getAttribute('data-index');
-        if (!gameActive || !isMyTurn || gameState[index] !== '') return;
+        
+        if (!gameActive || !isMyTurn || gameState[index] !== '') {
+            return;
+        }
 
         gameState[index] = mySymbol;
         isMyTurn = false;
@@ -847,7 +849,11 @@ function handleIncomingGameMessage(msg) {
                     gameStatusText.textContent = `🎉 Permainan Selesai! Pemenang: ${moveData.winner}`;
                 }
             } else {
-                isMyTurn = true;
+                if (moveData.symbol !== mySymbol) {
+                    isMyTurn = true;
+                } else {
+                    isMyTurn = false;
+                }
                 updateBoardUI();
             }
         }
