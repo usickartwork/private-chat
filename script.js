@@ -79,9 +79,9 @@ const optCancel = document.getElementById('opt-cancel');
 let messageCache = {};
 
 window.addEventListener('DOMContentLoaded', async () => {
-    if (currentUserId && currentUsername) {
-        const { data } = await supabaseClient.from('profiles').select('*').eq('id', currentUserId).single();
-        if (data) {
+    if (currentUserId) {
+        const { data, error } = await supabaseClient.from('profiles').select('*').eq('id', currentUserId).single();
+        if (!error && data) {
             currentUsername = data.username;
             currentUserAvatar = data.avatar_url;
             saveLocalStorage();
@@ -275,15 +275,28 @@ btnAddFriend.addEventListener('click', async () => {
 
 // MUAT DAFTAR TEMAN
 async function loadFriends() {
-    const { data: friendships } = await supabaseClient.from('friendships').select('friend_id').eq('user_id', currentUserId);
-    if (!friendships || friendships.length === 0) {
+    if (!currentUserId) return;
+
+    const { data: friendships, error: friendError } = await supabaseClient
+        .from('friendships')
+        .select('friend_id')
+        .eq('user_id', currentUserId);
+
+    if (friendError || !friendships || friendships.length === 0) {
         friendsList.innerHTML = '<p style="padding: 20px; text-align: center; color: #888; font-size: 13px;">Belum ada teman.</p>';
         return;
     }
 
     const friendIds = friendships.map(f => f.friend_id);
-    const { data: friendsProfiles } = await supabaseClient.from('profiles').select('*').in('id', friendIds);
-    if (!friendsProfiles) return;
+    const { data: friendsProfiles, error: profileError } = await supabaseClient
+        .from('profiles')
+        .select('*')
+        .in('id', friendIds);
+
+    if (profileError || !friendsProfiles || friendsProfiles.length === 0) {
+        friendsList.innerHTML = '<p style="padding: 20px; text-align: center; color: #888; font-size: 13px;">Belum ada teman.</p>';
+        return;
+    }
 
     friendsList.innerHTML = '';
 
