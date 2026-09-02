@@ -358,7 +358,11 @@ async function loadFriends() {
                 lastMsgText = 'Pesan telah dihapus';
             } else {
                 const prefix = msg.sender_id === currentUserId ? 'Kamu: ' : '';
-                lastMsgText = prefix + msg.message;
+                let cleanMsg = msg.message;
+                if (cleanMsg.startsWith('[GAME_MOVE]:') || cleanMsg.startsWith('[GAME_INVITE]:')) {
+                    cleanMsg = '🎮 [Aktivitas Permainan Tic-Tac-Toe]';
+                }
+                lastMsgText = prefix + cleanMsg;
             }
             const msgDate = new Date(msg.created_at);
             const today = new Date();
@@ -494,9 +498,8 @@ async function loadMessages() {
             if (msg.sender_id === currentUserId && msg.deleted_for_sender) return;
             if (msg.receiver_id === currentUserId && msg.deleted_for_receiver) return;
             
-            // Cek apakah pesan berisi instruksi game
-            if (msg.message && msg.message.startsWith('[GAME_MOVE]:')) {
-                handleIncomingGameMove(msg.message);
+            if (msg.message && (msg.message.startsWith('[GAME_MOVE]:') || msg.message.startsWith('[GAME_INVITE]:'))) {
+                handleIncomingGameMessage(msg.message);
             }
             
             appendMessage(msg);
@@ -518,10 +521,11 @@ function appendMessage(msg) {
     if (msg.sender_id === currentUserId && msg.deleted_for_sender) return;
     if (msg.receiver_id === currentUserId && msg.deleted_for_receiver) return;
 
-    // Sembunyikan token mentah [GAME_MOVE] dari teks chat langsung, tampilkan info rapi
     let textToDisplay = msg.message;
     if (textToDisplay && textToDisplay.startsWith('[GAME_MOVE]:')) {
         textToDisplay = '🎮 [Aktivitas Permainan Tic-Tac-Toe]';
+    } else if (textToDisplay && textToDisplay.startsWith('[GAME_INVITE]:')) {
+        textToDisplay = '🎮 [UNDANGAN GAME] Ayo main Tic-Tac-Toe!';
     }
 
     let wrapperEl = document.getElementById(`msg-wrap-${msg.id}`);
@@ -542,7 +546,7 @@ function appendMessage(msg) {
     if (!msg.is_deleted_for_all && msg.reply_to && messageCache[msg.reply_to]) {
         const repliedMsg = messageCache[msg.reply_to];
         let repText = repliedMsg.message;
-        if (repText && repText.startsWith('[GAME_MOVE]:')) repText = '🎮 [Aktivitas Permainan]';
+        if (repText && (repText.startsWith('[GAME_MOVE]:') || repText.startsWith('[GAME_INVITE]:'))) repText = '🎮 [Aktivitas Permainan]';
         const repliedSender = repliedMsg.sender_id === currentUserId ? 'Kamu' : `@${activeFriendName}`;
         replyHtml = `
             <div class="quoted-msg">
@@ -705,13 +709,15 @@ if (messageInput) {
 // --- LOGIKA MINI GAME TIC-TAC-TOE ---
 if (btnInviteGame) {
     btnInviteGame.addEventListener('click', async () => {
+        // Pembuat undangan otomatis jadi 'X'
+        startNewGame(true, 'X', 'O');
+        
         await supabaseClient.from('messages').insert([{
             sender_id: currentUserId,
             receiver_id: activeFriendId,
-            message: '🎮 [UNDANGAN GAME] Ayo main Tic-Tac-Toe!',
+            message: `[GAME_INVITE]:${JSON.stringify({ hostSymbol: 'X' })}`,
             status: 'sent'
         }]);
-        startNewGame(true, 'X', 'O');
     });
 }
 
@@ -791,19 +797,25 @@ function checkGameWinner() {
     }
 }
 
-function handleIncomingGameMove(msgText) {
+function handleIncomingGameMessage(msgText) {
     try {
-        const moveData = JSON.parse(msgText.replace('[GAME_MOVE]:', ''));
-        gameState = moveData.state;
-        isMyTurn = true;
-        if (!gameModal.classList.contains('active')) {
-            startNewGame(true, moveData.symbol === 'X' ? 'O' : 'X', moveData.symbol);
-        } else {
+        if (msgText.startsWith('[GAME_INVITE]:')) {
+            // Penerima undangan otomatis jadi 'O' dan menunggu giliran
+            startNewGame(false, 'O', 'X');
+        } else if (msgText.startsWith('[GAME_MOVE]:')) {
+            const moveData = JSON.parse(msgText.replace('[GAME_MOVE]:', ''));
+            gameState = moveData.state;
+            isMyTurn = true;
+            
+            if (!gameModal.classList.contains('active')) {
+                startNewGame(true, moveData.symbol === 'X' ? 'O' : 'X', moveData.symbol);
+                isMyTurn = true; 
+            }
             updateBoardUI();
             checkGameWinner();
         }
     } catch(e) {
-        console.error("Gagal memproses langkah game", e);
+        console.error("Gagal memproses pesan game", e);
     }
 }
 
@@ -821,8 +833,8 @@ function subscribeToRealtime() {
                     (msg.sender_id === activeFriendId && msg.receiver_id === currentUserId) ||
                     (msg.sender_id === currentUserId && msg.receiver_id === activeFriendId)
                 ) {
-                    if (msg.message && msg.message.startsWith('[GAME_MOVE]:')) {
-                        handleIncomingGameMove(msg.message);
+                    if (msg.message && (msg.message.startsWith('[GAME_MOVE]:') || msg.message.startsWith('[GAME_INVITE]:'))) {
+                        handleIncomingGameMessage(msg.message);
                     }
 
                     appendMessage(msg);
