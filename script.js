@@ -81,9 +81,9 @@ const gameCells = document.querySelectorAll('.game-cell');
 const gameStatusText = document.getElementById('game-status-text');
 
 let gameState = ['', '', '', '', '', '', '', '', ''];
-let isMyTurn = true;
-let mySymbol = 'X';
-let opponentSymbol = 'O';
+let isMyTurn = false;
+let mySymbol = '';
+let opponentSymbol = '';
 let gameActive = false;
 
 let messageCache = {};
@@ -303,7 +303,7 @@ if (btnAddFriend) {
             return;
         }
 
-        await supabaseClient.from('friendships').insert([
+        await supabaseClient.from('friendships'].insert([
             { user_id: currentUserId, friend_id: targetUser.id },
             { user_id: targetUser.id, friend_id: currentUserId }
         ]);
@@ -359,8 +359,8 @@ async function loadFriends() {
             } else {
                 const prefix = msg.sender_id === currentUserId ? 'Kamu: ' : '';
                 let cleanMsg = msg.message;
-                if (cleanMsg.startsWith('[GAME_MOVE]:') || cleanMsg.startsWith('[GAME_INVITE]:')) {
-                    cleanMsg = '🎮 [Aktivitas Permainan Tic-Tac-Toe]';
+                if (cleanMsg.startsWith('[GAME_')) {
+                    cleanMsg = '🎮 [Undangan / Sesi Permainan Tic-Tac-Toe]';
                 }
                 lastMsgText = prefix + cleanMsg;
             }
@@ -498,8 +498,8 @@ async function loadMessages() {
             if (msg.sender_id === currentUserId && msg.deleted_for_sender) return;
             if (msg.receiver_id === currentUserId && msg.deleted_for_receiver) return;
             
-            if (msg.message && (msg.message.startsWith('[GAME_MOVE]:') || msg.message.startsWith('[GAME_INVITE]:'))) {
-                handleIncomingGameMessage(msg.message);
+            if (msg.message && msg.message.startsWith('[GAME_')) {
+                handleIncomingGameMessage(msg);
             }
             
             appendMessage(msg);
@@ -522,10 +522,19 @@ function appendMessage(msg) {
     if (msg.receiver_id === currentUserId && msg.deleted_for_receiver) return;
 
     let textToDisplay = msg.message;
-    if (textToDisplay && textToDisplay.startsWith('[GAME_MOVE]:')) {
-        textToDisplay = '🎮 [Aktivitas Permainan Tic-Tac-Toe]';
-    } else if (textToDisplay && textToDisplay.startsWith('[GAME_INVITE]:')) {
-        textToDisplay = '🎮 [UNDANGAN GAME] Ayo main Tic-Tac-Toe!';
+    let isGameCard = false;
+
+    if (textToDisplay && textToDisplay.startsWith('[GAME_INVITE]:')) {
+        isGameCard = true;
+        const isSender = msg.sender_id === currentUserId;
+        textToDisplay = isSender 
+            ? '🎮 [UNDANGAN GAME] Kamu menantang teman bermain Tic-Tac-Toe. Menunggu persetujuan (acc)...' 
+            : '🎮 [UNDANGAN GAME] Teman mengajakmu bermain Tic-Tac-Toe!';
+    } else if (textToDisplay && textToDisplay.startsWith('[GAME_START]:')) {
+        isGameCard = true;
+        textToDisplay = '🎮 [GAME DIMULAI] Tantangan diterima! Permainan Tic-Tac-Toe sedang berlangsung.';
+    } else if (textToDisplay && textToDisplay.startsWith('[GAME_MOVE]:')) {
+        textToDisplay = '🎮 [Langkah Permainan Tic-Tac-Toe]';
     }
 
     let wrapperEl = document.getElementById(`msg-wrap-${msg.id}`);
@@ -542,11 +551,17 @@ function appendMessage(msg) {
         displayContent = '<em style="color: #888;">Pesan ini telah dihapus</em>';
     }
 
+    // Tambahkan tombol ACC jika ada undangan masuk dari teman dan belum di-acc
+    let actionButtonHtml = '';
+    if (isGameCard && msg.message.startsWith('[GAME_INVITE]:') && !isOutgoing) {
+        actionButtonHtml = `<button onclick="acceptGameInvite('${msg.id}')" style="margin-top: 8px; background: #000; color: #fff; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer;">Terima (Acc) Undangan</button>`;
+    }
+
     let replyHtml = '';
     if (!msg.is_deleted_for_all && msg.reply_to && messageCache[msg.reply_to]) {
         const repliedMsg = messageCache[msg.reply_to];
         let repText = repliedMsg.message;
-        if (repText && (repText.startsWith('[GAME_MOVE]:') || repText.startsWith('[GAME_INVITE]:'))) repText = '🎮 [Aktivitas Permainan]';
+        if (repText && repText.startsWith('[GAME_')) repText = '🎮 [Aktivitas Permainan]';
         const repliedSender = repliedMsg.sender_id === currentUserId ? 'Kamu' : `@${activeFriendName}`;
         replyHtml = `
             <div class="quoted-msg">
@@ -561,6 +576,7 @@ function appendMessage(msg) {
         msgItem.innerHTML = `
             ${replyHtml}
             <span class="msg-text">${displayContent}</span>
+            ${actionButtonHtml}
             <div class="msg-footer">
                 <span class="msg-time">${timeStr}</span>
                 ${statusIcon}
@@ -580,31 +596,12 @@ function appendMessage(msg) {
     div.innerHTML = `
         ${replyHtml}
         <span class="msg-text">${displayContent}</span>
+        ${actionButtonHtml}
         <div class="msg-footer">
             <span class="msg-time">${timeStr}</span>
             ${statusIcon}
         </div>
     `;
-
-    let startX = 0;
-    div.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; });
-    div.addEventListener('touchmove', (e) => {
-        let diff = e.touches[0].clientX - startX;
-        if (diff > 0 && diff < 100) wrapper.style.transform = `translateX(${diff}px)`;
-    });
-    div.addEventListener('touchend', (e) => {
-        let diff = e.changedTouches[0].clientX - startX;
-        wrapper.style.transform = `translateX(0px)`;
-        if (diff > 60 && !msg.is_deleted_for_all) {
-            triggerReply(msg.id, isOutgoing ? 'Kamu' : `@${activeFriendName}`, textToDisplay);
-        }
-    });
-
-    let pressTimer;
-    div.addEventListener('mousedown', () => { pressTimer = setTimeout(() => openMessageOptions(msg), 600); });
-    div.addEventListener('mouseup', () => clearTimeout(pressTimer));
-    div.addEventListener('touchstart', () => { pressTimer = setTimeout(() => openMessageOptions(msg), 600); });
-    div.addEventListener('touchend', () => clearTimeout(pressTimer));
 
     wrapper.appendChild(div);
     chatMessages.appendChild(wrapper);
@@ -706,18 +703,17 @@ if (messageInput) {
     messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
 }
 
-// --- LOGIKA MINI GAME TIC-TAC-TOE ---
+// --- LOGIKA MINI GAME TIC-TAC-TOE DENGAN SISTEM ACC & RANDOM SIMBOL ---
 if (btnInviteGame) {
     btnInviteGame.addEventListener('click', async () => {
-        // Pembuat undangan otomatis jadi 'X'
-        startNewGame(true, 'X', 'O');
-        
+        // Kirim undangan game ke teman
         await supabaseClient.from('messages').insert([{
             sender_id: currentUserId,
             receiver_id: activeFriendId,
-            message: `[GAME_INVITE]:${JSON.stringify({ hostSymbol: 'X' })}`,
+            message: `[GAME_INVITE]:${currentUserId}`,
             status: 'sent'
         }]);
+        alert('Undangan game telah dikirim ke temanmu. Menunggu persetujuan (acc)...');
     });
 }
 
@@ -728,11 +724,38 @@ if (btnCloseGame) {
     });
 }
 
-function startNewGame(myTurn, symbolA, symbolB) {
+// Fungsi ketika teman menekan tombol ACC (Terima Undangan)
+async function acceptGameInvite(inviteMsgId) {
+    // Tentukan secara acak siapa yang jadi X dan O
+    const randomChoice = Math.random() < 0.5;
+    const hostSymbol = randomChoice ? 'X' : 'O';
+    const guestSymbol = hostSymbol === 'X' ? 'O' : 'X';
+
+    const gameConfig = {
+        hostId: currentUserId, // Yang menerima acc / atau pembuat
+        symbols: {
+            [activeFriendId]: hostSymbol,
+            [currentUserId]: guestSymbol
+        },
+        turn: 'X' // X selalu jalan duluan
+    };
+
+    // Kirim sinyal bahwa game di-acc dan dimulai
+    await supabaseClient.from('messages').insert([{
+        sender_id: currentUserId,
+        receiver_id: activeFriendId,
+        message: `[GAME_START]:${JSON.stringify(gameConfig)}`,
+        status: 'sent'
+    }]);
+
+    initGameSession(gameConfig);
+}
+
+function initGameSession(config) {
     gameState = ['', '', '', '', '', '', '', '', ''];
-    isMyTurn = myTurn;
-    mySymbol = symbolA;
-    opponentSymbol = symbolB;
+    mySymbol = config.symbols[currentUserId];
+    opponentSymbol = mySymbol === 'X' ? 'O' : 'X';
+    isMyTurn = (config.turn === mySymbol);
     gameActive = true;
     updateBoardUI();
     gameModal.classList.add('active');
@@ -755,64 +778,66 @@ gameCells.forEach(cell => {
         gameState[index] = mySymbol;
         isMyTurn = false;
         updateBoardUI();
-        checkGameWinner();
+        
+        const hasWon = checkGameWinnerLocal();
 
         await supabaseClient.from('messages').insert([{
             sender_id: currentUserId,
             receiver_id: activeFriendId,
-            message: `[GAME_MOVE]:${JSON.stringify({ index, symbol: mySymbol, state: gameState })}`,
+            message: `[GAME_MOVE]:${JSON.stringify({ index, symbol: mySymbol, state: gameState, winner: hasWon })}`,
             status: 'sent'
         }]);
     });
 });
 
-function checkGameWinner() {
+function checkGameWinnerLocal() {
     const winningConditions = [
         [0,1,2], [3,4,5], [6,7,8], 
         [0,3,6], [1,4,7], [2,5,8], 
         [0,4,8], [2,4,6]           
     ];
 
-    let roundWon = false;
     for (let condition of winningConditions) {
         let a = gameState[condition[0]];
         let b = gameState[condition[1]];
         let c = gameState[condition[2]];
-        if (a === '' || b === '' || c === '') continue;
-        if (a === b && b === c) {
-            roundWon = true;
-            break;
+        if (a !== '' && a === b && b === c) {
+            gameStatusText.textContent = `🎉 Permainan Selesai! Pemenang: ${a}`;
+            gameActive = false;
+            return a;
         }
     }
 
-    if (roundWon) {
-        gameStatusText.textContent = `🎉 Selesai! Pemenang: ${isMyTurn ? opponentSymbol : mySymbol}`;
-        gameActive = false;
-        return;
-    }
-
     if (!gameState.includes('')) {
-        gameStatusText.textContent = `🤝 Permainan Seri!`;
+        gameStatusText.textContent = `🤝 Permainan Berakhir Seri!`;
         gameActive = false;
+        return 'tie';
     }
+    return null;
 }
 
-function handleIncomingGameMessage(msgText) {
+function handleIncomingGameMessage(msg) {
     try {
-        if (msgText.startsWith('[GAME_INVITE]:')) {
-            // Penerima undangan otomatis jadi 'O' dan menunggu giliran
-            startNewGame(false, 'O', 'X');
-        } else if (msgText.startsWith('[GAME_MOVE]:')) {
-            const moveData = JSON.parse(msgText.replace('[GAME_MOVE]:', ''));
+        const text = msg.message;
+        if (text.startsWith('[GAME_START]:')) {
+            const configData = JSON.parse(text.replace('[GAME_START]:', ''));
+            initGameSession(configData);
+        } else if (text.startsWith('[GAME_MOVE]:')) {
+            const moveData = JSON.parse(text.replace('[GAME_MOVE]:', ''));
             gameState = moveData.state;
-            isMyTurn = true;
             
-            if (!gameModal.classList.contains('active')) {
-                startNewGame(true, moveData.symbol === 'X' ? 'O' : 'X', moveData.symbol);
-                isMyTurn = true; 
+            if (moveData.winner) {
+                gameActive = false;
+                updateBoardUI();
+                if (moveData.winner === 'tie') {
+                    gameStatusText.textContent = `🤝 Permainan Berakhir Seri!`;
+                } else {
+                    gameStatusText.textContent = `🎉 Permainan Selesai! Pemenang: ${moveData.winner}`;
+                }
+            } else {
+                isMyTurn = true;
+                updateBoardUI();
             }
-            updateBoardUI();
-            checkGameWinner();
         }
     } catch(e) {
         console.error("Gagal memproses pesan game", e);
@@ -833,8 +858,8 @@ function subscribeToRealtime() {
                     (msg.sender_id === activeFriendId && msg.receiver_id === currentUserId) ||
                     (msg.sender_id === currentUserId && msg.receiver_id === activeFriendId)
                 ) {
-                    if (msg.message && (msg.message.startsWith('[GAME_MOVE]:') || msg.message.startsWith('[GAME_INVITE]:'))) {
-                        handleIncomingGameMessage(msg.message);
+                    if (msg.message && msg.message.startsWith('[GAME_')) {
+                        handleIncomingGameMessage(msg);
                     }
 
                     appendMessage(msg);
