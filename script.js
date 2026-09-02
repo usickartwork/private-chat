@@ -24,7 +24,7 @@ const loginScreen = document.getElementById('login-screen');
 const registerScreen = document.getElementById('register-screen');
 const homeScreen = document.getElementById('home-screen');
 const profileScreen = document.getElementById('profile-screen');
-const chatScreen = document.getElementById('chat-screen');
+const chatScreen = modelGetElement('chat-screen');
 
 const loginUsernameInput = document.getElementById('login-username');
 const loginPasswordInput = document.getElementById('login-password');
@@ -75,15 +75,18 @@ const optDeleteMe = document.getElementById('opt-delete-me');
 const optDeleteAll = document.getElementById('opt-delete-all');
 const optCancel = document.getElementById('opt-cancel');
 
+function modelGetElement(id) {
+    return document.getElementById(id);
+}
+
 let messageCache = {};
 
 window.addEventListener('DOMContentLoaded', async () => {
-    // Sembunyikan semua layar di awal agar tidak ada flicker/kedipan login
     loginScreen.classList.remove('active');
     registerScreen.classList.remove('active');
     homeScreen.classList.remove('active');
     profileScreen.classList.remove('active');
-    chatScreen.classList.remove('active');
+    if (chatScreen) chatScreen.classList.remove('active');
 
     history.replaceState({ screen: 'home' }, '');
 
@@ -106,7 +109,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 window.addEventListener('popstate', (event) => {
     messageOptionsModal.classList.remove('active');
 
-    if (chatScreen.classList.contains('active')) {
+    if (chatScreen && chatScreen.classList.contains('active')) {
         closeChatRoomInternal(false);
     } else if (profileScreen.classList.contains('active')) {
         profileScreen.classList.remove('active');
@@ -161,9 +164,9 @@ async function showHomeScreen(pushHistory = true) {
     loginScreen.classList.remove('active');
     registerScreen.classList.remove('active');
     profileScreen.classList.remove('active');
-    chatScreen.classList.remove('active');
+    if (chatScreen) chatScreen.classList.remove('active');
     homeScreen.classList.add('active');
-    myProfileName.textContent = `@${currentUsername}`;
+    if (myProfileName) myProfileName.textContent = `@${currentUsername}`;
     renderAvatar(myHeaderAvatar, currentUserAvatar, currentUsername);
 
     await supabaseClient.from('profiles').update({ is_online: true }).eq('id', currentUserId);
@@ -176,17 +179,21 @@ async function showHomeScreen(pushHistory = true) {
 }
 
 // BUKA HALAMAN PROFIL
-btnOpenProfile.addEventListener('click', () => {
-    homeScreen.classList.remove('active');
-    profileScreen.classList.add('active');
-    renderProfileAvatar();
-    profileStatus.textContent = '';
-    history.pushState({ screen: 'profile' }, '');
-});
+if (btnOpenProfile) {
+    btnOpenProfile.addEventListener('click', () => {
+        homeScreen.classList.remove('active');
+        profileScreen.classList.add('active');
+        renderProfileAvatar();
+        profileStatus.textContent = '';
+        history.pushState({ screen: 'profile' }, '');
+    });
+}
 
-btnBackProfile.addEventListener('click', () => {
-    history.back();
-});
+if (btnBackProfile) {
+    btnBackProfile.addEventListener('click', () => {
+        history.back();
+    });
+}
 
 function renderProfileAvatar() {
     if (currentUserAvatar) {
@@ -201,54 +208,58 @@ function renderProfileAvatar() {
 }
 
 // UPLOAD FOTO PROFIL KE SUPABASE STORAGE
-btnChangePhoto.addEventListener('click', () => avatarFileInput.click());
+if (btnChangePhoto) {
+    btnChangePhoto.addEventListener('click', () => avatarFileInput.click());
+}
 
-avatarFileInput.addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+if (avatarFileInput) {
+    avatarFileInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
 
-    profileStatus.style.color = '#007bff';
-    profileStatus.textContent = 'Mengunggah foto...';
+        profileStatus.style.color = '#007bff';
+        profileStatus.textContent = 'Mengunggah foto...';
 
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${currentUserId}_${Math.random().toString(36).substring(2)}.${fileExt}`;
-    const filePath = `${fileName}`;
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${currentUserId}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const filePath = `${fileName}`;
 
-    const { error: uploadError } = await supabaseClient.storage
-        .from('avatars')
-        .upload(filePath, file, { upsert: true });
+        const { error: uploadError } = await supabaseClient.storage
+            .from('avatars')
+            .upload(filePath, file, { upsert: true });
 
-    if (uploadError) {
-        profileStatus.style.color = '#dc3545';
-        profileStatus.textContent = 'Gagal mengunggah foto.';
-        return;
-    }
+        if (uploadError) {
+            profileStatus.style.color = '#dc3545';
+            profileStatus.textContent = 'Gagal mengunggah foto.';
+            return;
+        }
 
-    const { data: publicUrlData } = supabaseClient.storage
-        .from('avatars')
-        .getPublicUrl(filePath);
+        const { data: publicUrlData } = supabaseClient.storage
+            .from('avatars')
+            .getPublicUrl(filePath);
 
-    const avatarUrl = publicUrlData.publicUrl;
+        const avatarUrl = publicUrlData.publicUrl;
 
-    const { error: updateError } = await supabaseClient
-        .from('profiles')
-        .update({ avatar_url: avatarUrl })
-        .eq('id', currentUserId);
+        const { error: updateError } = await supabaseClient
+            .from('profiles')
+            .update({ avatar_url: avatarUrl })
+            .eq('id', currentUserId);
 
-    if (updateError) {
-        profileStatus.style.color = '#dc3545';
-        profileStatus.textContent = 'Gagal memperbarui profil.';
-        return;
-    }
+        if (updateError) {
+            profileStatus.style.color = '#dc3545';
+            profileStatus.textContent = 'Gagal memperbarui profil.';
+            return;
+        }
 
-    currentUserAvatar = avatarUrl;
-    saveLocalStorage();
-    renderProfileAvatar();
-    renderAvatar(myHeaderAvatar, currentUserAvatar, currentUsername);
+        currentUserAvatar = avatarUrl;
+        saveLocalStorage();
+        renderProfileAvatar();
+        renderAvatar(myHeaderAvatar, currentUserAvatar, currentUsername);
 
-    profileStatus.style.color = '#28a745';
-    profileStatus.textContent = 'Foto profil berhasil diperbarui!';
-});
+        profileStatus.style.color = '#28a745';
+        profileStatus.textContent = 'Foto profil berhasil diperbarui!';
+    });
+}
 
 function renderAvatar(containerEl, avatarUrl, username, size = '36px') {
     if (!containerEl) return;
@@ -267,34 +278,36 @@ function renderAvatar(containerEl, avatarUrl, username, size = '36px') {
 }
 
 // TAMBAH TEMAN
-btnAddFriend.addEventListener('click', async () => {
-    const targetUsername = friendUsernameInput.value.trim().toLowerCase();
-    if (!targetUsername) return;
-    if (targetUsername === currentUsername) { homeError.textContent = 'Tidak bisa menambahkan diri sendiri!'; return; }
-    homeError.textContent = '';
+if (btnAddFriend) {
+    btnAddFriend.addEventListener('click', async () => {
+        const targetUsername = friendUsernameInput.value.trim().toLowerCase();
+        if (!targetUsername) return;
+        if (targetUsername === currentUsername) { homeError.textContent = 'Tidak bisa menambahkan diri sendiri!'; return; }
+        homeError.textContent = '';
 
-    const { data: targetUser, error: searchError } = await supabaseClient.from('profiles').select('*').eq('username', targetUsername).single();
-    if (searchError || !targetUser) { homeError.textContent = 'Username tidak ditemukan!'; return; }
+        const { data: targetUser, error: searchError } = await supabaseClient.from('profiles').select('*').eq('username', targetUsername).single();
+        if (searchError || !targetUser) { homeError.textContent = 'Username tidak ditemukan!'; return; }
 
-    const { data: existingFriend } = await supabaseClient
-        .from('friendships')
-        .select('*')
-        .eq('user_id', currentUserId)
-        .eq('friend_id', targetUser.id)
-        .single();
+        const { data: existingFriend } = await supabaseClient
+            .from('friendships')
+            .select('*')
+            .eq('user_id', currentUserId)
+            .eq('friend_id', targetUser.id)
+            .single();
 
-    if (existingFriend) {
-        homeError.textContent = 'Teman sudah ada di daftar kontak!';
-        return;
-    }
+        if (existingFriend) {
+            homeError.textContent = 'Teman sudah ada di daftar kontak!';
+            return;
+        }
 
-    await supabaseClient.from('friendships').insert([
-        { user_id: currentUserId, friend_id: targetUser.id },
-        { user_id: targetUser.id, friend_id: currentUserId }
-    ]);
-    friendUsernameInput.value = '';
-    loadFriends();
-});
+        await supabaseClient.from('friendships').insert([
+            { user_id: currentUserId, friend_id: targetUser.id },
+            { user_id: targetUser.id, friend_id: currentUserId }
+        ]);
+        friendUsernameInput.value = '';
+        loadFriends();
+    });
+}
 
 // MUAT DAFTAR TEMAN
 async function loadFriends() {
@@ -449,9 +462,11 @@ function subscribePartnerStatus(friendId) {
 }
 
 // TOMBOL KEMBALI
-btnBack.addEventListener('click', () => {
-    history.back();
-});
+if (btnBack) {
+    btnBack.addEventListener('click', () => {
+        history.back();
+    });
+}
 
 function closeChatRoomInternal(pushHistory = true) {
     if (chatSubscription) supabaseClient.removeChannel(chatSubscription);
@@ -590,32 +605,40 @@ function openMessageOptions(msg) {
     messageOptionsModal.classList.add('active');
 }
 
-optCancel.addEventListener('click', () => { messageOptionsModal.classList.remove('active'); });
+if (optCancel) {
+    optCancel.addEventListener('click', () => { messageOptionsModal.classList.remove('active'); });
+}
 
-optReply.addEventListener('click', () => {
-    messageOptionsModal.classList.remove('active');
-    const msg = selectedMessageForAction;
-    const isOutgoing = msg.sender_id === currentUserId;
-    triggerReply(msg.id, isOutgoing ? 'Kamu' : `@${activeFriendName}`, msg.message);
-});
+if (optReply) {
+    optReply.addEventListener('click', () => {
+        messageOptionsModal.classList.remove('active');
+        const msg = selectedMessageForAction;
+        const isOutgoing = msg.sender_id === currentUserId;
+        triggerReply(msg.id, isOutgoing ? 'Kamu' : `@${activeFriendName}`, msg.message);
+    });
+}
 
-optDeleteMe.addEventListener('click', async () => {
-    messageOptionsModal.classList.remove('active');
-    const msg = selectedMessageForAction;
-    const isSender = msg.sender_id === currentUserId;
+if (optDeleteMe) {
+    optDeleteMe.addEventListener('click', async () => {
+        messageOptionsModal.classList.remove('active');
+        const msg = selectedMessageForAction;
+        const isSender = msg.sender_id === currentUserId;
 
-    const updateField = isSender ? { deleted_for_sender: true } : { deleted_for_receiver: true };
-    await supabaseClient.from('messages').update(updateField).eq('id', msg.id);
+        const updateField = isSender ? { deleted_for_sender: true } : { deleted_for_receiver: true };
+        await supabaseClient.from('messages').update(updateField).eq('id', msg.id);
 
-    const el = document.getElementById(`msg-wrap-${msg.id}`);
-    if (el) el.remove();
-});
+        const el = document.getElementById(`msg-wrap-${msg.id}`);
+        if (el) el.remove();
+    });
+}
 
-optDeleteAll.addEventListener('click', async () => {
-    messageOptionsModal.classList.remove('active');
-    const msg = selectedMessageForAction;
-    await supabaseClient.from('messages').update({ is_deleted_for_all: true, message: '' }).eq('id', msg.id);
-});
+if (optDeleteAll) {
+    optDeleteAll.addEventListener('click', async () => {
+        messageOptionsModal.classList.remove('active');
+        const msg = selectedMessageForAction;
+        await supabaseClient.from('messages').update({ is_deleted_for_all: true, message: '' }).eq('id', msg.id);
+    });
+}
 
 function triggerReply(msgId, senderLabel, text) {
     replyingToMessageId = msgId;
@@ -630,7 +653,9 @@ function cancelReply() {
     replyPreviewBox.classList.remove('active');
 }
 
-btnCancelReply.addEventListener('click', cancelReply);
+if (btnCancelReply) {
+    btnCancelReply.addEventListener('click', cancelReply);
+}
 
 function escapeHtml(text) {
     const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
@@ -654,8 +679,13 @@ async function sendMessage() {
     }]);
 }
 
-btnSend.addEventListener('click', sendMessage);
-messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
+if (btnSend) {
+    btnSend.addEventListener('click', sendMessage);
+}
+
+if (messageInput) {
+    messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
+}
 
 function subscribeToRealtime() {
     if (chatSubscription) supabaseClient.removeChannel(chatSubscription);
@@ -710,7 +740,7 @@ document.addEventListener("visibilitychange", async () => {
     if (document.visibilityState === "visible") {
         await supabaseClient.from('profiles').update({ is_online: true }).eq('id', currentUserId);
         
-        if (chatScreen.classList.contains('active') && activeFriendId) {
+        if (chatScreen && chatScreen.classList.contains('active') && activeFriendId) {
             await loadMessages();
             await markMessagesAsRead();
             subscribeToRealtime();
@@ -747,7 +777,9 @@ function clearLocalStorage() {
     currentUserAvatar = null;
 }
 
-btnLogout.addEventListener('click', () => {
-    clearLocalStorage();
-    location.reload();
-});
+if (btnLogout) {
+    btnLogout.addEventListener('click', () => {
+        clearLocalStorage();
+        location.reload();
+    });
+}
