@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Private Chat - Profile & Avatar</title>
+    <title>Textinaja - Private Chat</title>
     <link rel="stylesheet" href="style.css">
     <style>
-        /* Styling untuk Navigasi Menu Bawah ala WhatsApp/Mobile App */
         .bottom-nav {
             display: flex;
             justify-content: space-around;
@@ -35,7 +34,6 @@
         .nav-item.active {
             color: #007bff;
         }
-        /* Penyesuaian container agar tidak tertutup nav bawah */
         #home-screen .friends-list {
             padding-bottom: 70px;
         }
@@ -117,10 +115,13 @@
 
     <!-- 3. SCREEN: HOME / CONTACT LIST -->
     <div id="home-screen" class="screen">
-        <div class="section-title" style="padding: 16px 16px 8px 16px; font-size: 18px; font-weight: bold;">Daftar Kontak</div>
+        <div style="padding: 16px 16px 4px 16px; background: #fff; border-bottom: 1px solid #f1f3f5;">
+            <h1 style="font-size: 22px; font-weight: bold; color: #007bff; margin: 0;">Textinaja</h1>
+            <p style="font-size: 12px; color: #868e96; margin-top: 2px;">Daftar kontak</p>
+        </div>
+
         <div id="friends-list" class="friends-list"></div>
 
-        <!-- Navigasi Bar di Bawah (Pesan / Kontak & Profil) -->
         <div class="bottom-nav">
             <button class="nav-item active">
                 <span>💬</span>
@@ -133,7 +134,7 @@
         </div>
     </div>
 
-    <!-- 4. SCREEN: PROFILE & SETTINGS (Termasuk Tambah Teman & Logout di Bawah) -->
+    <!-- 4. SCREEN: PROFILE & SETTINGS -->
     <div id="profile-screen" class="screen">
         <div class="chat-header">
             <button id="btn-back-profile" class="btn-icon">←</button>
@@ -150,7 +151,6 @@
             <button id="btn-change-photo" class="btn primary" style="width: auto; padding: 6px 14px; font-size: 12px;">Ganti Foto Profil</button>
             <p id="profile-status" class="error-small" style="color: #28a745; margin-top: 4px;"></p>
             
-            <!-- Pengaturan di Bawah: Tambah Teman & Logout -->
             <div class="profile-menu-list">
                 <div style="background: #f8f9fa; padding: 12px; border-radius: 12px; display: flex; flex-direction: column; gap: 8px;">
                     <span style="font-size: 13px; font-weight: 600; text-align: left; color: #495057;">Tambah Teman Baru</span>
