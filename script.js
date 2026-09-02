@@ -17,7 +17,6 @@ let selectedMessageForAction = null;
 
 let chatSubscription = null;
 let homeSubscription = null;
-let profileStatusSubscription = null;
 
 // DOM Elements
 const loginScreen = document.getElementById('login-screen');
@@ -41,7 +40,6 @@ const toLoginBtn = document.getElementById('to-login');
 
 const myProfileName = document.getElementById('my-profile-name');
 const myHeaderAvatar = document.getElementById('my-header-avatar');
-const myProfileStatus = document.getElementById('my-profile-status');
 const btnOpenProfile = document.getElementById('btn-open-profile');
 const btnBackProfile = document.getElementById('btn-back-profile');
 const btnLogout = document.getElementById('btn-logout');
@@ -58,7 +56,6 @@ const homeError = document.getElementById('home-error');
 const friendsList = document.getElementById('friends-list');
 
 const chatPartnerName = document.getElementById('chat-partner-name');
-const chatStatusIndicator = document.getElementById('chat-status-indicator');
 const chatPartnerAvatarContainer = document.getElementById('chat-partner-avatar-container');
 const btnBack = document.getElementById('btn-back');
 const chatMessages = document.getElementById('chat-messages');
@@ -79,29 +76,15 @@ const optCancel = document.getElementById('opt-cancel');
 let messageCache = {};
 
 window.addEventListener('DOMContentLoaded', async () => {
-    if (currentUserId) {
-        const { data, error } = await supabaseClient.from('profiles').select('*').eq('id', currentUserId).single();
-        if (!error && data) {
-            currentUsername = data.username;
+    if (currentUserId && currentUsername) {
+        const { data } = await supabaseClient.from('profiles').select('*').eq('id', currentUserId).single();
+        if (data) {
             currentUserAvatar = data.avatar_url;
             saveLocalStorage();
             showHomeScreen();
         } else {
             clearLocalStorage();
         }
-    }
-});
-
-// GESTURE / TOMBOL BACK DEVICE
-window.addEventListener('popstate', (event) => {
-    messageOptionsModal.classList.remove('active');
-
-    if (chatScreen.classList.contains('active')) {
-        closeChatRoomInternal();
-    } else if (profileScreen.classList.contains('active')) {
-        profileScreen.classList.remove('active');
-        homeScreen.classList.add('active');
-        loadFriends();
     }
 });
 
@@ -121,7 +104,7 @@ btnRegister.addEventListener('click', async () => {
     const { data: existingUser } = await supabaseClient.from('profiles').select('*').eq('username', username).single();
     if (existingUser) { regError.textContent = 'Username sudah dipakai orang lain!'; return; }
 
-    const { error: insertError } = await supabaseClient.from('profiles').insert([{ username, password, is_online: false }]);
+    const { error: insertError } = await supabaseClient.from('profiles').insert([{ username, password }]);
     if (insertError) { regError.textContent = 'Gagal mendaftar.'; return; }
 
     alert('Akun berhasil dibuat! Silakan masuk.');
@@ -147,26 +130,20 @@ btnLogin.addEventListener('click', async () => {
     showHomeScreen();
 });
 
-async function showHomeScreen() {
+function showHomeScreen() {
     loginScreen.classList.remove('active');
     registerScreen.classList.remove('active');
     profileScreen.classList.remove('active');
     chatScreen.classList.remove('active');
     homeScreen.classList.add('active');
     myProfileName.textContent = `@${currentUsername}`;
-    myProfileStatus.textContent = 'Online';
-    myProfileStatus.style.color = '#28a745';
     renderAvatar(myHeaderAvatar, currentUserAvatar, currentUsername);
-
-    await supabaseClient.from('profiles').update({ is_online: true }).eq('id', currentUserId);
-
-    loadFriends();
+    loadFriends(true);
     subscribeHomeRealtime();
 }
 
 // BUKA HALAMAN PROFIL
 btnOpenProfile.addEventListener('click', () => {
-    history.pushState({ screen: 'profile' }, '');
     homeScreen.classList.remove('active');
     profileScreen.classList.add('active');
     renderProfileAvatar();
@@ -174,7 +151,9 @@ btnOpenProfile.addEventListener('click', () => {
 });
 
 btnBackProfile.addEventListener('click', () => {
-    history.back();
+    profileScreen.classList.remove('active');
+    homeScreen.classList.add('active');
+    loadFriends(false);
 });
 
 function renderProfileAvatar() {
@@ -185,7 +164,7 @@ function renderProfileAvatar() {
     } else {
         profileLargeImg.style.display = 'none';
         profileLargeAvatar.style.display = 'flex';
-        profileLargeAvatar.textContent = currentUsername ? currentUsername.charAt(0).toUpperCase() : '?';
+        profileLargeAvatar.textContent = currentUsername.charAt(0).toUpperCase();
     }
 }
 
@@ -240,7 +219,6 @@ avatarFileInput.addEventListener('change', async (e) => {
 });
 
 function renderAvatar(containerEl, avatarUrl, username, size = '36px') {
-    if (!containerEl) return;
     containerEl.style.width = size;
     containerEl.style.height = size;
     containerEl.innerHTML = '';
@@ -265,53 +243,26 @@ btnAddFriend.addEventListener('click', async () => {
     const { data: targetUser, error: searchError } = await supabaseClient.from('profiles').select('*').eq('username', targetUsername).single();
     if (searchError || !targetUser) { homeError.textContent = 'Username tidak ditemukan!'; return; }
 
-    // Cek apakah sudah berteman sebelumnya
-    const { data: existingFriend } = await supabaseClient
-        .from('friendships')
-        .select('*')
-        .eq('user_id', currentUserId)
-        .eq('friend_id', targetUser.id)
-        .single();
-
-    if (existingFriend) {
-        homeError.textContent = 'Teman sudah ada di daftar kontak!';
-        return;
-    }
-
     await supabaseClient.from('friendships').insert([
         { user_id: currentUserId, friend_id: targetUser.id },
         { user_id: targetUser.id, friend_id: currentUserId }
     ]);
     friendUsernameInput.value = '';
-    loadFriends();
+    loadFriends(true);
 });
 
 // MUAT DAFTAR TEMAN
-async function loadFriends() {
-    if (!currentUserId) return;
-
-    const { data: friendships, error: friendError } = await supabaseClient
-        .from('friendships')
-        .select('friend_id')
-        .eq('user_id', currentUserId);
-
-    if (friendError || !friendships || friendships.length === 0) {
-        friendsList.innerHTML = '<p style="padding: 20px; text-align: center; color: #888; font-size: 13px;">Belum ada teman.</p>';
+async function loadFriends(isInitial = false) {
+    const { data: friendships } = await supabaseClient.from('friendships').select('friend_id').eq('user_id', currentUserId);
+    if (!friendships || friendships.length === 0) {
+        if (isInitial) friendsList.innerHTML = '<p style="padding: 20px; text-align: center; color: #888; font-size: 13px;">Belum ada teman.</p>';
         return;
     }
 
     const friendIds = friendships.map(f => f.friend_id);
-    const { data: friendsProfiles, error: profileError } = await supabaseClient
-        .from('profiles')
-        .select('*')
-        .in('id', friendIds);
-
-    if (profileError || !friendsProfiles || friendsProfiles.length === 0) {
-        friendsList.innerHTML = '<p style="padding: 20px; text-align: center; color: #888; font-size: 13px;">Belum ada teman.</p>';
-        return;
-    }
-
-    friendsList.innerHTML = '';
+    const { data: friendsProfiles } = await supabaseClient.from('profiles').select('*').in('id', friendIds);
+    if (!friendsProfiles) return;
+    if (isInitial) friendsList.innerHTML = '';
 
     for (const friend of friendsProfiles) {
         const { data: lastMsgs } = await supabaseClient
@@ -347,25 +298,44 @@ async function loadFriends() {
                 : msgDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
         }
 
-        const div = document.createElement('div');
-        div.id = `friend-${friend.id}`;
-        div.className = `friend-item ${isUnread ? 'unread' : ''}`;
-        div.innerHTML = `
-            <div class="friend-avatar"></div>
-            <div class="friend-info">
-                <div class="friend-top-row">
-                    <span class="friend-name">@${friend.username}</span>
-                    <span class="friend-time">${timeStr}</span>
+        let friendEl = document.getElementById(`friend-${friend.id}`);
+        
+        if (friendEl) {
+            friendEl.className = `friend-item ${isUnread ? 'unread' : ''}`;
+            const avatarDiv = friendEl.querySelector('.friend-avatar');
+            renderAvatar(avatarDiv, friend.avatar_url, friend.username, '44px');
+            friendEl.querySelector('.friend-time').textContent = timeStr;
+            friendEl.querySelector('.friend-last-msg').textContent = lastMsgText;
+            
+            const bottomRow = friendEl.querySelector('.friend-bottom-row');
+            let badgeEl = bottomRow.querySelector('.unread-badge');
+            if (isUnread) {
+                if (badgeEl) badgeEl.textContent = unreadCount;
+                else bottomRow.insertAdjacentHTML('beforeend', `<span class="unread-badge">${unreadCount}</span>`);
+            } else if (badgeEl) {
+                badgeEl.remove();
+            }
+        } else {
+            const div = document.createElement('div');
+            div.id = `friend-${friend.id}`;
+            div.className = `friend-item ${isUnread ? 'unread' : ''}`;
+            div.innerHTML = `
+                <div class="friend-avatar"></div>
+                <div class="friend-info">
+                    <div class="friend-top-row">
+                        <span class="friend-name">@${friend.username}</span>
+                        <span class="friend-time">${timeStr}</span>
+                    </div>
+                    <div class="friend-bottom-row">
+                        <span class="friend-last-msg">${escapeHtml(lastMsgText)}</span>
+                        ${isUnread ? `<span class="unread-badge">${unreadCount}</span>` : ''}
+                    </div>
                 </div>
-                <div class="friend-bottom-row">
-                    <span class="friend-last-msg">${escapeHtml(lastMsgText)}</span>
-                    ${isUnread ? `<span class="unread-badge">${unreadCount}</span>` : ''}
-                </div>
-            </div>
-        `;
-        renderAvatar(div.querySelector('.friend-avatar'), friend.avatar_url, friend.username, '44px');
-        div.addEventListener('click', () => openChatRoom(friend.id, friend.username, friend.avatar_url));
-        friendsList.appendChild(div);
+            `;
+            renderAvatar(div.querySelector('.friend-avatar'), friend.avatar_url, friend.username, '44px');
+            div.addEventListener('click', () => openChatRoom(friend.id, friend.username, friend.avatar_url));
+            friendsList.appendChild(div);
+        }
     }
 }
 
@@ -378,56 +348,14 @@ async function openChatRoom(friendId, friendName, friendAvatar) {
     activeFriendAvatar = friendAvatar;
     cancelReply();
 
-    history.pushState({ screen: 'chat' }, '');
     homeScreen.classList.remove('active');
     chatScreen.classList.add('active');
     chatPartnerName.textContent = `@${friendName}`;
     renderAvatar(chatPartnerAvatarContainer, friendAvatar, friendName, '36px');
 
-    await checkPartnerStatus(friendId);
-    subscribeProfileStatus(friendId);
-
     await loadMessages();
     await markMessagesAsRead();
     subscribeToRealtime();
-}
-
-async function checkPartnerStatus(friendId) {
-    const { data } = await supabaseClient.from('profiles').select('is_online').eq('id', friendId).single();
-    if (data) {
-        chatStatusIndicator.textContent = data.is_online ? 'Online' : 'Offline';
-        chatStatusIndicator.style.color = data.is_online ? '#28a745' : '#888';
-    }
-}
-
-function subscribeProfileStatus(friendId) {
-    if (profileStatusSubscription) supabaseClient.removeChannel(profileStatusSubscription);
-
-    profileStatusSubscription = supabaseClient
-        .channel(`profile-status-${friendId}`)
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${friendId}` }, payload => {
-            if (payload && payload.new) {
-                const isOnline = payload.new.is_online;
-                chatStatusIndicator.textContent = isOnline ? 'Online' : 'Offline';
-                chatStatusIndicator.style.color = isOnline ? '#28a745' : '#888';
-            }
-        })
-        .subscribe();
-}
-
-// TOMBOL KEMBALI
-btnBack.addEventListener('click', () => {
-    history.back();
-});
-
-function closeChatRoomInternal() {
-    if (chatSubscription) supabaseClient.removeChannel(chatSubscription);
-    if (profileStatusSubscription) supabaseClient.removeChannel(profileStatusSubscription);
-    chatScreen.classList.remove('active');
-    homeScreen.classList.add('active');
-    activeFriendId = null;
-    loadFriends();
-    subscribeHomeRealtime();
 }
 
 async function loadMessages() {
@@ -667,38 +595,21 @@ function subscribeHomeRealtime() {
     homeSubscription = supabaseClient
         .channel(`home-${currentUserId}`)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${currentUserId}` }, () => {
-            if (homeScreen.classList.contains('active')) loadFriends();
+            if (homeScreen.classList.contains('active')) loadFriends(false);
         })
         .subscribe();
 }
 
-// DETEKSI VISIBILITAS TAB
 document.addEventListener("visibilitychange", async () => {
-    if (!currentUserId) return;
-
     if (document.visibilityState === "visible") {
-        myProfileStatus.textContent = 'Online';
-        myProfileStatus.style.color = '#28a745';
-        await supabaseClient.from('profiles').update({ is_online: true }).eq('id', currentUserId);
-        
         if (chatScreen.classList.contains('active') && activeFriendId) {
             await loadMessages();
             await markMessagesAsRead();
             subscribeToRealtime();
         } else if (homeScreen.classList.contains('active')) {
-            loadFriends();
+            loadFriends(false);
             subscribeHomeRealtime();
         }
-    } else {
-        myProfileStatus.textContent = 'Offline';
-        myProfileStatus.style.color = '#888';
-        await supabaseClient.from('profiles').update({ is_online: false }).eq('id', currentUserId);
-    }
-});
-
-window.addEventListener('beforeunload', () => {
-    if (currentUserId) {
-        supabaseClient.from('profiles').update({ is_online: false }).eq('id', currentUserId);
     }
 });
 
@@ -709,9 +620,6 @@ function saveLocalStorage() {
 }
 
 function clearLocalStorage() {
-    if (currentUserId) {
-        supabaseClient.from('profiles').update({ is_online: false }).eq('id', currentUserId);
-    }
     localStorage.removeItem('chat_user_id');
     localStorage.removeItem('chat_username');
     localStorage.removeItem('chat_avatar');
@@ -719,6 +627,14 @@ function clearLocalStorage() {
     currentUsername = null;
     currentUserAvatar = null;
 }
+
+btnBack.addEventListener('click', () => {
+    if (chatSubscription) supabaseClient.removeChannel(chatSubscription);
+    chatScreen.classList.remove('active');
+    homeScreen.classList.add('active');
+    loadFriends(true);
+    subscribeHomeRealtime();
+});
 
 btnLogout.addEventListener('click', () => {
     clearLocalStorage();
