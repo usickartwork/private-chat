@@ -17,6 +17,7 @@ let selectedMessageForAction = null;
 
 let chatSubscription = null;
 let homeSubscription = null;
+let presenceChannel = null;
 
 // DOM Elements
 const loginScreen = document.getElementById('login-screen');
@@ -40,6 +41,7 @@ const toLoginBtn = document.getElementById('to-login');
 
 const myProfileName = document.getElementById('my-profile-name');
 const myHeaderAvatar = document.getElementById('my-header-avatar');
+const myProfileStatus = document.getElementById('my-profile-status');
 const btnOpenProfile = document.getElementById('btn-open-profile');
 const btnBackProfile = document.getElementById('btn-back-profile');
 const btnLogout = document.getElementById('btn-logout');
@@ -56,6 +58,7 @@ const homeError = document.getElementById('home-error');
 const friendsList = document.getElementById('friends-list');
 
 const chatPartnerName = document.getElementById('chat-partner-name');
+const chatStatusIndicator = document.getElementById('chat-status-indicator');
 const chatPartnerAvatarContainer = document.getElementById('chat-partner-avatar-container');
 const btnBack = document.getElementById('btn-back');
 const chatMessages = document.getElementById('chat-messages');
@@ -76,36 +79,15 @@ const optCancel = document.getElementById('opt-cancel');
 let messageCache = {};
 
 window.addEventListener('DOMContentLoaded', async () => {
-    history.replaceState({ screen: 'home' }, '');
-
     if (currentUserId && currentUsername) {
         const { data } = await supabaseClient.from('profiles').select('*').eq('id', currentUserId).single();
         if (data) {
             currentUserAvatar = data.avatar_url;
             saveLocalStorage();
-            showHomeScreen(false);
+            showHomeScreen();
         } else {
             clearLocalStorage();
         }
-    }
-});
-
-// PENGATURAN TOMBOL BACK HARDWARE / GESTURE HP TANPA JEDA
-window.addEventListener('popstate', (event) => {
-    const state = event.state;
-    
-    // Tutup modal opsi jika terbuka
-    messageOptionsModal.classList.remove('active');
-
-    if (!state || state.screen === 'home') {
-        // Sembunyikan semua screen sub-halaman secara instan
-        chatScreen.classList.remove('active');
-        profileScreen.classList.remove('active');
-        homeScreen.classList.add('active');
-
-        if (chatSubscription) supabaseClient.removeChannel(chatSubscription);
-        loadFriends();
-        subscribeHomeRealtime();
     }
 });
 
@@ -148,10 +130,10 @@ btnLogin.addEventListener('click', async () => {
     currentUsername = user.username;
     currentUserAvatar = user.avatar_url;
     saveLocalStorage();
-    showHomeScreen(true);
+    showHomeScreen();
 });
 
-function showHomeScreen(pushHistory = true) {
+function showHomeScreen() {
     loginScreen.classList.remove('active');
     registerScreen.classList.remove('active');
     profileScreen.classList.remove('active');
@@ -161,8 +143,40 @@ function showHomeScreen(pushHistory = true) {
     renderAvatar(myHeaderAvatar, currentUserAvatar, currentUsername);
     loadFriends();
     subscribeHomeRealtime();
-    if (pushHistory) {
-        history.pushState({ screen: 'home' }, '');
+    setupPresence();
+}
+
+// SETUP PRESENCE (STATUS ONLINE / OFFLINE)
+function setupPresence() {
+    if (presenceChannel) supabaseClient.removeChannel(presenceChannel);
+
+    presenceChannel = supabaseClient.channel('online-status', {
+        config: { presence: { key: currentUserId } }
+    });
+
+    presenceChannel.subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+            myProfileStatus.textContent = 'Online';
+            myProfileStatus.style.color = '#28a745';
+            await presenceChannel.track({ online_at: new Date().toISOString() });
+        }
+    });
+
+    presenceChannel.on('presence', { event: 'sync' }, () => {
+        const state = presenceChannel.presenceState();
+        if (activeFriendId) {
+            updatePartnerStatus(state);
+        }
+    });
+}
+
+function updatePartnerStatus(state) {
+    if (state[activeFriendId]) {
+        chatStatusIndicator.textContent = 'Online';
+        chatStatusIndicator.style.color = '#28a745';
+    } else {
+        chatStatusIndicator.textContent = 'Offline';
+        chatStatusIndicator.style.color = '#888';
     }
 }
 
@@ -172,11 +186,12 @@ btnOpenProfile.addEventListener('click', () => {
     profileScreen.classList.add('active');
     renderProfileAvatar();
     profileStatus.textContent = '';
-    history.pushState({ screen: 'profile' }, '');
 });
 
 btnBackProfile.addEventListener('click', () => {
-    history.back();
+    profileScreen.classList.remove('active');
+    homeScreen.classList.add('active');
+    loadFriends();
 });
 
 function renderProfileAvatar() {
@@ -381,15 +396,31 @@ async function openChatRoom(friendId, friendName, friendAvatar) {
     chatPartnerName.textContent = `@${friendName}`;
     renderAvatar(chatPartnerAvatarContainer, friendAvatar, friendName, '36px');
 
+    if (presenceChannel) {
+        const state = presenceChannel.presenceState();
+        updatePartnerStatus(state);
+    }
+
     await loadMessages();
     await markMessagesAsRead();
     subscribeToRealtime();
-
-    history.pushState({ screen: 'chat' }, '');
 }
 
+// TOMBOL KEMBALI DI POJOK KIRI ATAS / GESTURE HP
 btnBack.addEventListener('click', () => {
-    history.back();
+    if (chatSubscription) supabaseClient.removeChannel(chatSubscription);
+    chatScreen.classList.remove('active');
+    homeScreen.classList.add('active');
+    activeFriendId = null;
+    loadFriends();
+    subscribeHomeRealtime();
+    if (presenceChannel) {
+        const state = presenceChannel.presenceState();
+        if (state[currentUserId]) {
+            myProfileStatus.textContent = 'Online';
+            myProfileStatus.style.color = '#28a745';
+        }
+    }
 });
 
 async function loadMessages() {
@@ -635,7 +666,14 @@ function subscribeHomeRealtime() {
 }
 
 document.addEventListener("visibilitychange", async () => {
-    if (document.visibilityState === "visible") {
+    if (document.visibilityState === "hidden") {
+        if (presenceChannel) {
+            await presenceChannel.untrack();
+        }
+    } else if (document.visibilityState === "visible") {
+        if (presenceChannel) {
+            await presenceChannel.track({ online_at: new Date().toISOString() });
+        }
         if (chatScreen.classList.contains('active') && activeFriendId) {
             await loadMessages();
             await markMessagesAsRead();
@@ -654,6 +692,7 @@ function saveLocalStorage() {
 }
 
 function clearLocalStorage() {
+    if (presenceChannel) supabaseClient.removeChannel(presenceChannel);
     localStorage.removeItem('chat_user_id');
     localStorage.removeItem('chat_username');
     localStorage.removeItem('chat_avatar');
