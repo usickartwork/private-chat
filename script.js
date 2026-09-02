@@ -303,7 +303,7 @@ if (btnAddFriend) {
             return;
         }
 
-        await supabaseClient.from('friendships'].insert([
+        await supabaseClient.from('friendships').insert([
             { user_id: currentUserId, friend_id: targetUser.id },
             { user_id: targetUser.id, friend_id: currentUserId }
         ]);
@@ -551,10 +551,21 @@ function appendMessage(msg) {
         displayContent = '<em style="color: #888;">Pesan ini telah dihapus</em>';
     }
 
-    // Tambahkan tombol ACC jika ada undangan masuk dari teman dan belum di-acc
-    let actionButtonHtml = '';
+    // Pembuatan elemen tombol ACC secara aman dengan DOM API untuk mencegah error/freeze
+    let actionButtonContainer = null;
     if (isGameCard && msg.message.startsWith('[GAME_INVITE]:') && !isOutgoing) {
-        actionButtonHtml = `<button onclick="acceptGameInvite('${msg.id}')" style="margin-top: 8px; background: #000; color: #fff; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer;">Terima (Acc) Undangan</button>`;
+        actionButtonContainer = document.createElement('div');
+        actionButtonContainer.style.marginTop = '8px';
+        
+        const acceptBtn = document.createElement('button');
+        acceptBtn.textContent = 'Terima (Acc) Undangan';
+        acceptBtn.style.cssText = 'background: #000; color: #fff; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer;';
+        
+        acceptBtn.addEventListener('click', () => {
+            acceptGameInvite(msg.id);
+        });
+        
+        actionButtonContainer.appendChild(acceptBtn);
     }
 
     let replyHtml = '';
@@ -576,12 +587,14 @@ function appendMessage(msg) {
         msgItem.innerHTML = `
             ${replyHtml}
             <span class="msg-text">${displayContent}</span>
-            ${actionButtonHtml}
             <div class="msg-footer">
                 <span class="msg-time">${timeStr}</span>
                 ${statusIcon}
             </div>
         `;
+        if (actionButtonContainer) {
+            msgItem.appendChild(actionButtonContainer);
+        }
         return;
     }
 
@@ -596,12 +609,15 @@ function appendMessage(msg) {
     div.innerHTML = `
         ${replyHtml}
         <span class="msg-text">${displayContent}</span>
-        ${actionButtonHtml}
         <div class="msg-footer">
             <span class="msg-time">${timeStr}</span>
             ${statusIcon}
         </div>
     `;
+
+    if (actionButtonContainer) {
+        div.appendChild(actionButtonContainer);
+    }
 
     wrapper.appendChild(div);
     chatMessages.appendChild(wrapper);
@@ -706,7 +722,6 @@ if (messageInput) {
 // --- LOGIKA MINI GAME TIC-TAC-TOE DENGAN SISTEM ACC & RANDOM SIMBOL ---
 if (btnInviteGame) {
     btnInviteGame.addEventListener('click', async () => {
-        // Kirim undangan game ke teman
         await supabaseClient.from('messages').insert([{
             sender_id: currentUserId,
             receiver_id: activeFriendId,
@@ -724,23 +739,20 @@ if (btnCloseGame) {
     });
 }
 
-// Fungsi ketika teman menekan tombol ACC (Terima Undangan)
 async function acceptGameInvite(inviteMsgId) {
-    // Tentukan secara acak siapa yang jadi X dan O
     const randomChoice = Math.random() < 0.5;
     const hostSymbol = randomChoice ? 'X' : 'O';
     const guestSymbol = hostSymbol === 'X' ? 'O' : 'X';
 
     const gameConfig = {
-        hostId: currentUserId, // Yang menerima acc / atau pembuat
+        hostId: currentUserId,
         symbols: {
             [activeFriendId]: hostSymbol,
             [currentUserId]: guestSymbol
         },
-        turn: 'X' // X selalu jalan duluan
+        turn: 'X'
     };
 
-    // Kirim sinyal bahwa game di-acc dan dimulai
     await supabaseClient.from('messages').insert([{
         sender_id: currentUserId,
         receiver_id: activeFriendId,
