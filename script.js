@@ -168,6 +168,12 @@ btnLogin.addEventListener('click', async () => {
     showHomeScreen(true);
 });
 
+async function requestNotificationPermission() {
+    if ('Notification' in window && Notification.permission !== 'granted') {
+        await Notification.requestPermission();
+    }
+}
+
 async function showHomeScreen(pushHistory = true) {
     loginScreen.classList.remove('active');
     registerScreen.classList.remove('active');
@@ -178,6 +184,7 @@ async function showHomeScreen(pushHistory = true) {
     renderAvatar(myHeaderAvatar, currentUserAvatar, currentUsername);
 
     await supabaseClient.from('profiles').update({ is_online: true }).eq('id', currentUserId);
+    requestNotificationPermission();
 
     loadFriends();
     subscribeHomeRealtime();
@@ -520,6 +527,19 @@ async function markMessagesAsRead() {
         .eq('sender_id', activeFriendId)
         .eq('receiver_id', currentUserId)
         .eq('status', 'sent');
+}
+
+function showBrowserNotification(senderName, messageText) {
+    if ('Notification' in window && Notification.permission === 'granted' && document.hidden) {
+        navigator.serviceWorker.ready.then(registration => {
+            registration.showNotification(`Pesan baru dari @${senderName}`, {
+                body: messageText,
+                icon: 'https://cdn-icons-png.flaticon.com/512/1041/1041916.png',
+                badge: 'https://cdn-icons-png.flaticon.com/512/1041/1041916.png',
+                vibrate: [200, 100, 200]
+            });
+        });
+    }
 }
 
 function appendMessage(msg) {
@@ -996,6 +1016,7 @@ function subscribeToRealtime() {
                     appendMessage(msg);
                     if (msg.sender_id === activeFriendId && msg.receiver_id === currentUserId) {
                         await supabaseClient.from('messages').update({ status: 'read' }).eq('id', msg.id);
+                        showBrowserNotification(activeFriendName, msg.message);
                     }
                 }
             }
@@ -1019,8 +1040,11 @@ function subscribeHomeRealtime() {
 
     homeSubscription = supabaseClient
         .channel(`home-${currentUserId}`)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${currentUserId}` }, () => {
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `receiver_id=eq.${currentUserId}` }, (payload) => {
             if (homeScreen.classList.contains('active')) loadFriends();
+            if (payload && payload.new && payload.new.sender_id !== activeFriendId) {
+                showBrowserNotification('Teman', payload.new.message);
+            }
         })
         .subscribe();
 }
