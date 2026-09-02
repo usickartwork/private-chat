@@ -366,8 +366,8 @@ input[type="text"]:focus, input[type="password"]:focus {
 
 .chat-input-area {
     display: flex;
-    padding: 10px 12px;
-    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    padding: 14px 16px;
+    padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px));
     background: #ffffff;
     border-top: 1px solid #eee;
     gap: 8px;
