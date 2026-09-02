@@ -150,7 +150,6 @@ btnAddFriend.addEventListener('click', async () => {
         return;
     }
 
-    // Masukkan relasi dua arah
     await supabaseClient
         .from('friendships')
         .insert([
@@ -318,13 +317,12 @@ messageInput.addEventListener('keypress', (e) => {
     }
 });
 
-// 5. REALTIME LISTENER YANG DIPERBAIKI
+// 5. REALTIME LISTENER
 function subscribeToRealtime() {
     if (chatSubscription) {
         supabaseClient.removeChannel(chatSubscription);
     }
 
-    // Buat nama channel unik berdasarkan kombinasi dua user yang sedang chat
     const sortedIds = [currentUserId, activeFriendId].sort().join('-');
 
     chatSubscription = supabaseClient
@@ -367,6 +365,19 @@ function subscribeToRealtime() {
         })
         .subscribe();
 }
+
+// Otomatis sinkronisasi ulang saat PWA kembali dibuka / aktif di layar
+document.addEventListener("visibilitychange", async () => {
+    if (document.visibilityState === "visible") {
+        if (chatScreen.classList.contains('active') && activeFriendId) {
+            await loadMessages();
+            await markMessagesAsRead();
+            subscribeToRealtime();
+        } else if (homeScreen.classList.contains('active')) {
+            loadFriends();
+        }
+    }
+});
 
 function saveLocalStorage() {
     localStorage.setItem('chat_user_id', currentUserId);
