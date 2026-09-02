@@ -214,10 +214,9 @@ async function enterChatRoom() {
     chatScreen.classList.add('active');
     roomCodeDisplay.textContent = `Kode: ${currentRoomCode}`;
     
+    subscribeToRealtime();
     await loadParticipantsAndHeader();
     await loadMessages();
-    subscribeToRealtime();
-    // Jalankan setelah subscribe aktif agar event update tertangkap
     await markMessagesAsRead();
 }
 
@@ -251,17 +250,15 @@ async function loadMessages() {
 }
 
 async function markMessagesAsRead() {
-    // Ambil semua pesan yang dikirim oleh partner dan statusnya masih 'sent'
-    const { data: unreadMsgs } = await supabaseClient
+    const { data: unreadMsgs, error } = await supabaseClient
         .from('messages')
         .select('id')
         .eq('room_id', currentRoomId)
         .neq('sender_id', sessionId)
         .eq('status', 'sent');
 
-    if (unreadMsgs && unreadMsgs.length > 0) {
+    if (!error && unreadMsgs && unreadMsgs.length > 0) {
         for (let msg of unreadMsgs) {
-            // Update satu per satu menggunakan ID agar mentrigger realtime broadcast dengan akurat
             await supabaseClient
                 .from('messages')
                 .update({ status: 'read' })
@@ -367,7 +364,6 @@ function subscribeToRealtime() {
         }, payload => {
             if (payload && payload.new) {
                 appendMessage(payload.new);
-                // Jika pesan baru masuk dan kita sedang di room, langsung ubah statusnya jadi read via ID
                 if (payload.new.sender_id !== sessionId) {
                     supabaseClient
                         .from('messages')
