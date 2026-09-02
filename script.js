@@ -79,30 +79,26 @@ const optCancel = document.getElementById('opt-cancel');
 let messageCache = {};
 
 window.addEventListener('DOMContentLoaded', async () => {
-    history.replaceState({ screen: 'home' }, '');
-
     if (currentUserId && currentUsername) {
         const { data } = await supabaseClient.from('profiles').select('*').eq('id', currentUserId).single();
         if (data) {
             currentUserAvatar = data.avatar_url;
             saveLocalStorage();
-            showHomeScreen(false);
+            showHomeScreen();
         } else {
             clearLocalStorage();
         }
     }
 });
 
-// MENDUKUNG GESTURE BACK / TOMBOL BACK DEVICE SECARA HALUS TANPA LOOP
+// MENDUKUNG TOMBOL / GESTURE BACK SEMUA DEVICE
 window.addEventListener('popstate', (event) => {
     messageOptionsModal.classList.remove('active');
 
     if (chatScreen.classList.contains('active')) {
-        executeBackToHome();
+        closeChatRoomInternal();
     } else if (profileScreen.classList.contains('active')) {
-        profileScreen.classList.remove('active');
-        homeScreen.classList.add('active');
-        loadFriends();
+        closeProfileScreenInternal();
     }
 });
 
@@ -145,10 +141,10 @@ btnLogin.addEventListener('click', async () => {
     currentUsername = user.username;
     currentUserAvatar = user.avatar_url;
     saveLocalStorage();
-    showHomeScreen(true);
+    showHomeScreen();
 });
 
-function showHomeScreen(pushHistory = true) {
+function showHomeScreen() {
     loginScreen.classList.remove('active');
     registerScreen.classList.remove('active');
     profileScreen.classList.remove('active');
@@ -159,12 +155,9 @@ function showHomeScreen(pushHistory = true) {
     loadFriends();
     subscribeHomeRealtime();
     setupPresence();
-    if (pushHistory) {
-        history.replaceState({ screen: 'home' }, '');
-    }
 }
 
-// SETUP PRESENCE (STATUS ONLINE / OFFLINE REALTIME)
+// SETUP PRESENCE (STATUS ONLINE / OFFLINE)
 function setupPresence() {
     if (presenceChannel) supabaseClient.removeChannel(presenceChannel);
 
@@ -180,8 +173,6 @@ function setupPresence() {
 
     presenceChannel.on('presence', { event: 'sync' }, () => {
         const state = presenceChannel.presenceState();
-        
-        // Cek status partner di chat room
         if (activeFriendId) {
             if (state[activeFriendId]) {
                 chatStatusIndicator.textContent = 'Online';
@@ -196,19 +187,22 @@ function setupPresence() {
 
 // BUKA HALAMAN PROFIL
 btnOpenProfile.addEventListener('click', () => {
+    history.pushState({ screen: 'profile' }, '');
     homeScreen.classList.remove('active');
     profileScreen.classList.add('active');
     renderProfileAvatar();
     profileStatus.textContent = '';
-    history.pushState({ screen: 'profile' }, '');
 });
 
 btnBackProfile.addEventListener('click', () => {
+    history.back();
+});
+
+function closeProfileScreenInternal() {
     profileScreen.classList.remove('active');
     homeScreen.classList.add('active');
     loadFriends();
-    history.replaceState({ screen: 'home' }, '');
-});
+}
 
 function renderProfileAvatar() {
     if (currentUserAvatar) {
@@ -407,6 +401,7 @@ async function openChatRoom(friendId, friendName, friendAvatar) {
     activeFriendAvatar = friendAvatar;
     cancelReply();
 
+    history.pushState({ screen: 'chat' }, '');
     homeScreen.classList.remove('active');
     chatScreen.classList.add('active');
     chatPartnerName.textContent = `@${friendName}`;
@@ -414,29 +409,32 @@ async function openChatRoom(friendId, friendName, friendAvatar) {
 
     if (presenceChannel) {
         const state = presenceChannel.presenceState();
-        updatePartnerStatus(state);
+        if (state[activeFriendId]) {
+            chatStatusIndicator.textContent = 'Online';
+            chatStatusIndicator.style.color = '#28a745';
+        } else {
+            chatStatusIndicator.textContent = 'Offline';
+            chatStatusIndicator.style.color = '#888';
+        }
     }
 
     await loadMessages();
     await markMessagesAsRead();
     subscribeToRealtime();
-
-    history.pushState({ screen: 'chat' }, '');
 }
 
-// TOMBOL KEMBALI / GESTURE BACK
+// TOMBOL KEMBALI
 btnBack.addEventListener('click', () => {
-    executeBackToHome();
+    history.back();
 });
 
-function executeBackToHome() {
+function closeChatRoomInternal() {
     if (chatSubscription) supabaseClient.removeChannel(chatSubscription);
     chatScreen.classList.remove('active');
     homeScreen.classList.add('active');
     activeFriendId = null;
     loadFriends();
     subscribeHomeRealtime();
-    history.replaceState({ screen: 'home' }, '');
 }
 
 async function loadMessages() {
@@ -681,7 +679,7 @@ function subscribeHomeRealtime() {
         .subscribe();
 }
 
-// DETEKSI AKTIF/TIDAKNYA TAB WEB UNTUK STATUS ONLINE SECARA INSTAN
+// DETEKSI STATUS VISIBILITAS TAB UNTUK PRESENCE ONLINE / OFFLINE
 document.addEventListener("visibilitychange", async () => {
     if (document.visibilityState === "visible") {
         myProfileStatus.textContent = 'Online';
