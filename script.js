@@ -57,7 +57,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-// Penanganan agar tampilan otomatis menyesuaikan saat keyboard HP muncul/tertutup
+// Penanganan viewport mobile
 if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', () => {
         if (chatScreen.classList.contains('active')) {
@@ -66,7 +66,6 @@ if (window.visualViewport) {
     });
 }
 
-// Paksa reset tampilan ketika user batal mengetik / keyboard tertutup (blur)
 messageInput.addEventListener('blur', () => {
     setTimeout(() => {
         window.scrollTo(0, 0);
@@ -217,6 +216,7 @@ async function enterChatRoom() {
     
     await loadParticipantsAndHeader();
     await loadMessages();
+    await markMessagesAsRead();
     subscribeToRealtime();
 }
 
@@ -249,21 +249,48 @@ async function loadMessages() {
     }
 }
 
+// Tandai pesan dari partner sebagai 'read' saat kita buka room / baca pesan
+async function markMessagesAsRead() {
+    await supabaseClient
+        .from('messages')
+        .update({ status: 'read' })
+        .eq('room_id', currentRoomId)
+        .neq('sender_id', sessionId)
+        .eq('status', 'sent');
+}
+
 function appendMessage(msg) {
-    if (document.getElementById(`msg-${msg.id}`)) return;
+    let msgEl = document.getElementById(`msg-${msg.id}`);
+    const isOutgoing = msg.sender_id === sessionId;
+    const timeStr = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
+    // Status ikon: ✓ (sent) atau ✓✓ (read berwarna biru)
+    let statusIcon = '';
+    if (isOutgoing) {
+        statusIcon = `<span class="msg-status ${msg.status === 'read' ? 'read' : ''}">${msg.status === 'read' ? '✓✓' : '✓'}</span>`;
+    }
+
+    if (msgEl) {
+        // Jika elemen sudah ada, update statusnya saja jika berubah
+        const statusEl = msgEl.querySelector('.msg-status');
+        if (statusEl) {
+            statusEl.className = `msg-status ${msg.status === 'read' ? 'read' : ''}`;
+            statusEl.textContent = msg.status === 'read' ? '✓✓' : '✓';
+        }
+        return;
+    }
 
     const div = document.createElement('div');
     div.id = `msg-${msg.id}`;
-    const isOutgoing = msg.sender_id === sessionId;
-    
     div.className = `message-item ${isOutgoing ? 'outgoing' : 'incoming'}`;
-
-    const timeStr = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     div.innerHTML = `
         <span class="msg-sender">${escapeHtml(msg.sender_name)}</span>
         <span class="msg-text">${escapeHtml(msg.message)}</span>
-        <span class="msg-time">${timeStr}</span>
+        <div class="msg-footer">
+            <span class="msg-time">${timeStr}</span>
+            ${statusIcon}
+        </div>
     `;
 
     chatMessages.appendChild(div);
@@ -293,7 +320,8 @@ async function sendMessage() {
             room_id: currentRoomId,
             sender_id: sessionId,
             sender_name: currentUserName,
-            message: text
+            message: text,
+            status: 'sent'
         }]);
 
     if (error) {
@@ -317,6 +345,23 @@ function subscribeToRealtime() {
         .channel(`room-${currentRoomId}`)
         .on('postgres_changes', {
             event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            filter: `room_id=eq.${currentRoomId}`
+        }, payload => {
+            if (payload && payload.new) {
+                appendMessage(payload.new);
+                // Jika pesan baru dari partner, otomatis ubah statusnya jadi read karena kita sedang aktif di room
+                if (payload.new.sender_id !== sessionId) {
+                    supabaseClient
+                        .from('messages')
+                        .update({ status: 'read' })
+                        .eq('id', payload.new.id);
+                }
+            }
+        })
+        .on('postgres_changes', {
+            event: 'UPDATE',
             schema: 'public',
             table: 'messages',
             filter: `room_id=eq.${currentRoomId}`

@@ -11,7 +11,7 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 100dvh; /* Menggunakan dynamic viewport height agar pas saat keyboard muncul */
+    height: 100dvh;
     overflow: hidden;
 }
 
@@ -68,7 +68,7 @@ input[type="text"] {
     padding: 12px 14px;
     border: 1px solid #ddd;
     border-radius: 8px;
-    font-size: 16px; /* Ukuran 16px mencegah browser iOS/Android melakukan zoom otomatis */
+    font-size: 16px;
     outline: none;
     transition: border-color 0.2s;
 }
@@ -173,6 +173,18 @@ input[type="text"]:focus {
     -webkit-overflow-scrolling: touch;
 }
 
+/* Animasi Pesan Masuk */
+@keyframes messageAppear {
+    from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
 .message-item {
     max-width: 75%;
     padding: 10px 14px;
@@ -181,6 +193,7 @@ input[type="text"]:focus {
     word-wrap: break-word;
     display: flex;
     flex-direction: column;
+    animation: messageAppear 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .message-item.incoming {
@@ -232,7 +245,7 @@ input[type="text"]:focus {
     border: 1px solid #ddd;
     border-radius: 20px;
     outline: none;
-    font-size: 16px; /* Wajib 16px untuk mencegah zoom di HP */
+    font-size: 16px;
 }
 
 .btn-send {
@@ -247,4 +260,31 @@ input[type="text"]:focus {
 
 .btn-send:hover {
     background: #0056b3;
+}
+
+.msg-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.msg-time {
+    font-size: 10px;
+    color: #888;
+}
+
+.message-item.outgoing .msg-time {
+    color: #555;
+}
+
+.msg-status {
+    font-size: 11px;
+    font-weight: bold;
+    color: #888; /* Warna abu-abu untuk terkirim (sent) */
+}
+
+.msg-status.read {
+    color: #027eb5; /* Warna biru untuk terbaca (read) */
 }
