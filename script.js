@@ -6,8 +6,8 @@ const { createClient } = supabase;
 const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // State Aplikasi
-let currentRoomId = null;
-let currentRoomCode = null;
+let currentRoomId = localStorage.getItem('chat_room_id') || null;
+let currentRoomCode = localStorage.getItem('chat_room_code') || null;
 let currentParticipantId = null;
 let currentUserName = localStorage.getItem('chat_user_name') || '';
 let sessionId = localStorage.getItem('chat_session_id');
@@ -34,10 +34,29 @@ const btnBack = document.getElementById('btn-back');
 const roomTitle = document.getElementById('room-title');
 const roomCodeDisplay = document.getElementById('room-code-display');
 
-// Set value input nama jika sebelumnya sudah tersimpan
 if (currentUserName) {
     usernameInput.value = currentUserName;
 }
+
+// AUTO-RECONNECT: Jika sebelumnya sudah masuk room dan di-refresh, langsung pulihkan sesi
+window.addEventListener('DOMContentLoaded', async () => {
+    if (currentRoomId && currentUserName) {
+        // Validasi apakah partisipan masih tercatat di database room tersebut
+        const { data: partData } = await supabaseClient
+            .from('participants')
+            .select('*')
+            .eq('room_id', currentRoomId)
+            .eq('session_id', sessionId)
+            .single();
+
+        if (partData) {
+            currentParticipantId = partData.id;
+            enterChatRoom();
+        } else {
+            clearSessionStorage();
+        }
+    }
+});
 
 function showError(msg) {
     errorMsg.textContent = msg;
@@ -73,12 +92,13 @@ btnCreate.addEventListener('click', async () => {
 
     if (roomError) {
         showError('Gagal membuat room. Coba lagi.');
-        console.error(roomError);
         return;
     }
 
     currentRoomId = roomData.id;
     currentRoomCode = roomData.room_code;
+    localStorage.setItem('chat_room_id', currentRoomId);
+    localStorage.setItem('chat_room_code', currentRoomCode);
 
     const { data: partData, error: partError } = await supabaseClient
         .from('participants')
@@ -92,7 +112,6 @@ btnCreate.addEventListener('click', async () => {
 
     if (partError) {
         showError('Gagal bergabung ke room.');
-        console.error(partError);
         return;
     }
 
@@ -130,6 +149,8 @@ btnJoin.addEventListener('click', async () => {
 
     currentRoomId = roomData.id;
     currentRoomCode = roomData.room_code;
+    localStorage.setItem('chat_room_id', currentRoomId);
+    localStorage.setItem('chat_room_code', currentRoomCode);
 
     const { data: participants, error: countError } = await supabaseClient
         .from('participants')
@@ -178,8 +199,8 @@ async function enterChatRoom() {
     chatScreen.classList.add('active');
     roomCodeDisplay.textContent = `Kode: ${currentRoomCode}`;
     
-    loadParticipantsAndHeader();
-    loadMessages();
+    await loadParticipantsAndHeader();
+    await loadMessages();
     subscribeToRealtime();
 }
 
@@ -213,7 +234,11 @@ async function loadMessages() {
 }
 
 function appendMessage(msg) {
+    // Mencegah duplikasi pesan di layar
+    if (document.getElementById(`msg-${msg.id}`)) return;
+
     const div = document.createElement('div');
+    div.id = `msg-${msg.id}`;
     const isOutgoing = msg.sender_id === sessionId;
     
     div.className = `message-item ${isOutgoing ? 'outgoing' : 'incoming'}`;
@@ -247,7 +272,7 @@ async function sendMessage() {
 
     messageInput.value = '';
 
-    await supabaseClient
+    const { error } = await supabaseClient
         .from('messages')
         .insert([{
             room_id: currentRoomId,
@@ -255,6 +280,10 @@ async function sendMessage() {
             sender_name: currentUserName,
             message: text
         }]);
+
+    if (error) {
+        console.error("Gagal mengirim pesan:", error);
+    }
 }
 
 btnSend.addEventListener('click', sendMessage);
@@ -264,21 +293,23 @@ messageInput.addEventListener('keypress', (e) => {
     }
 });
 
-// Realtime Subscription dengan Channel Unik per Room
+// Realtime Subscription yang Diperbarui
 function subscribeToRealtime() {
     if (messageSubscription) {
         supabaseClient.removeChannel(messageSubscription);
     }
 
     messageSubscription = supabaseClient
-        .channel(`room-channel-${currentRoomId}`)
+        .channel(`room-${currentRoomId}`)
         .on('postgres_changes', {
             event: 'INSERT',
             schema: 'public',
             table: 'messages',
             filter: `room_id=eq.${currentRoomId}`
         }, payload => {
-            appendMessage(payload.new);
+            if (payload && payload.new) {
+                appendMessage(payload.new);
+            }
         })
         .on('postgres_changes', {
             event: 'INSERT',
@@ -288,19 +319,23 @@ function subscribeToRealtime() {
         }, () => {
             loadParticipantsAndHeader();
         })
-        .subscribe((status) => {
-            console.log("Realtime status:", status);
-        });
+        .subscribe();
+}
+
+function clearSessionStorage() {
+    localStorage.removeItem('chat_room_id');
+    localStorage.removeItem('chat_room_code');
+    currentRoomId = null;
+    currentRoomCode = null;
 }
 
 btnBack.addEventListener('click', () => {
     if (messageSubscription) {
         supabaseClient.removeChannel(messageSubscription);
     }
+    clearSessionStorage();
     chatScreen.classList.remove('active');
     homeScreen.classList.add('active');
     roomCodeInput.value = '';
     errorMsg.textContent = '';
-    currentRoomId = null;
-    currentRoomCode = null;
 });
