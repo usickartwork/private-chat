@@ -1,4 +1,4 @@
-// Konfigurasi Supabase (Ganti dengan milikmu)
+// Konfigurasi Supabase
 const SUPABASE_URL = 'https://frvcokzxlpwhpiougcpy.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZydmNva3p4bHB3aHBpb3VnY3B5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgzMTg4MjYsImV4cCI6MjEwMzg5NDgyNn0.ECF67GKqhOnX7kEKPDgyBpR044gAKPUZD1TARFkHNIY';
 
@@ -9,7 +9,7 @@ const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentRoomId = null;
 let currentRoomCode = null;
 let currentParticipantId = null;
-let currentUserName = '';
+let currentUserName = localStorage.getItem('chat_user_name') || '';
 let sessionId = localStorage.getItem('chat_session_id');
 
 if (!sessionId) {
@@ -34,12 +34,15 @@ const btnBack = document.getElementById('btn-back');
 const roomTitle = document.getElementById('room-title');
 const roomCodeDisplay = document.getElementById('room-code-display');
 
-// Helper untuk menampilkan error
+// Set value input nama jika sebelumnya sudah tersimpan
+if (currentUserName) {
+    usernameInput.value = currentUserName;
+}
+
 function showError(msg) {
     errorMsg.textContent = msg;
 }
 
-// Generate Kode Room Unik (6 Karakter)
 function generateRoomCode() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let code = '';
@@ -58,10 +61,10 @@ btnCreate.addEventListener('click', async () => {
     }
     showError('');
     currentUserName = name;
+    localStorage.setItem('chat_user_name', currentUserName);
 
     const roomCode = generateRoomCode();
 
-    // Buat room di database
     const { data: roomData, error: roomError } = await supabaseClient
         .from('rooms')
         .insert([{ room_code: roomCode }])
@@ -77,7 +80,6 @@ btnCreate.addEventListener('click', async () => {
     currentRoomId = roomData.id;
     currentRoomCode = roomData.room_code;
 
-    // Masukkan pembuat sebagai participant pertama
     const { data: partData, error: partError } = await supabaseClient
         .from('participants')
         .insert([{
@@ -113,8 +115,8 @@ btnJoin.addEventListener('click', async () => {
     }
     showError('');
     currentUserName = name;
+    localStorage.setItem('chat_user_name', currentUserName);
 
-    // Cari room berdasarkan kode
     const { data: roomData, error: roomError } = await supabaseClient
         .from('rooms')
         .select('*')
@@ -129,7 +131,6 @@ btnJoin.addEventListener('click', async () => {
     currentRoomId = roomData.id;
     currentRoomCode = roomData.room_code;
 
-    // Cek jumlah peserta saat ini di room
     const { data: participants, error: countError } = await supabaseClient
         .from('participants')
         .select('*')
@@ -140,7 +141,6 @@ btnJoin.addEventListener('click', async () => {
         return;
     }
 
-    // Cek apakah user ini sudah ada di room (re-connect / refresh)
     const existingUser = participants.find(p => p.session_id === sessionId);
 
     if (existingUser) {
@@ -149,13 +149,11 @@ btnJoin.addEventListener('click', async () => {
         return;
     }
 
-    // Jika sudah ada 2 orang, tolak!
     if (participants.length >= 2) {
         showError('Maaf, room ini sudah penuh (maksimal 2 orang)!');
         return;
     }
 
-    // Masukkan sebagai peserta kedua
     const { data: partData, error: partError } = await supabaseClient
         .from('participants')
         .insert([{
@@ -175,13 +173,11 @@ btnJoin.addEventListener('click', async () => {
     enterChatRoom();
 });
 
-// Masuk ke Tampilan Chat
 async function enterChatRoom() {
     homeScreen.classList.remove('active');
     chatScreen.classList.add('active');
     roomCodeDisplay.textContent = `Kode: ${currentRoomCode}`;
     
-    // Ambil nama partner jika ada
     loadParticipantsAndHeader();
     loadMessages();
     subscribeToRealtime();
@@ -203,7 +199,6 @@ async function loadParticipantsAndHeader() {
     }
 }
 
-// Ambil Riwayat Pesan
 async function loadMessages() {
     chatMessages.innerHTML = '';
     const { data: messages, error } = await supabaseClient
@@ -217,7 +212,6 @@ async function loadMessages() {
     }
 }
 
-// Tambah Pesan ke Tampilan UI
 function appendMessage(msg) {
     const div = document.createElement('div');
     const isOutgoing = msg.sender_id === sessionId;
@@ -236,7 +230,6 @@ function appendMessage(msg) {
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-// Fungsi Keamanan Dasar HTML Escape
 function escapeHtml(text) {
     const map = {
         '&': '&amp;',
@@ -248,7 +241,6 @@ function escapeHtml(text) {
     return text.replace(/[&<>"']/g, function(m) { return map[m]; });
 }
 
-// Kirim Pesan
 async function sendMessage() {
     const text = messageInput.value.trim();
     if (!text) return;
@@ -272,15 +264,14 @@ messageInput.addEventListener('keypress', (e) => {
     }
 });
 
-// Realtime Subscription (Mendengar pesan baru & perubahan peserta)
-// Realtime Subscription (Mendengar pesan baru & perubahan peserta)
+// Realtime Subscription dengan Channel Unik per Room
 function subscribeToRealtime() {
     if (messageSubscription) {
         supabaseClient.removeChannel(messageSubscription);
     }
 
     messageSubscription = supabaseClient
-        .channel('public-chat-room')
+        .channel(`room-channel-${currentRoomId}`)
         .on('postgres_changes', {
             event: 'INSERT',
             schema: 'public',
@@ -302,7 +293,6 @@ function subscribeToRealtime() {
         });
 }
 
-// Keluar / Kembali ke Home
 btnBack.addEventListener('click', () => {
     if (messageSubscription) {
         supabaseClient.removeChannel(messageSubscription);
