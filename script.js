@@ -156,7 +156,6 @@ async function showHomeScreen(pushHistory = true) {
     myProfileName.textContent = `@${currentUsername}`;
     renderAvatar(myHeaderAvatar, currentUserAvatar, currentUsername);
 
-    // Set status online di database saat masuk home
     await supabaseClient.from('profiles').update({ is_online: true }).eq('id', currentUserId);
 
     loadFriends();
@@ -397,15 +396,15 @@ async function openChatRoom(friendId, friendName, friendAvatar) {
     chatPartnerName.textContent = `@${friendName}`;
     renderAvatar(chatPartnerAvatarContainer, friendAvatar, friendName, '36px');
 
-    await checkPartnerStatus(friendId);
-    subscribeProfileStatus(friendId);
+    await checkPartnerIdStatus(friendId);
+    subscribePartnerStatus(friendId);
 
     await loadMessages();
     await markMessagesAsRead();
     subscribeToRealtime();
 }
 
-async function checkPartnerStatus(friendId) {
+async function checkPartnerIdStatus(friendId) {
     const { data } = await supabaseClient.from('profiles').select('is_online').eq('id', friendId).single();
     if (data) {
         chatStatusIndicator.textContent = data.is_online ? 'Online' : 'Offline';
@@ -413,12 +412,17 @@ async function checkPartnerStatus(friendId) {
     }
 }
 
-function subscribeProfileStatus(friendId) {
+function subscribePartnerStatus(friendId) {
     if (profileStatusSubscription) supabaseClient.removeChannel(profileStatusSubscription);
 
     profileStatusSubscription = supabaseClient
-        .channel(`profile-status-${friendId}`)
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${friendId}` }, payload => {
+        .channel(`live-status-${friendId}`)
+        .on('postgres_changes', { 
+            event: 'UPDATE', 
+            schema: 'public', 
+            table: 'profiles', 
+            filter: `id=eq.${friendId}` 
+        }, payload => {
             if (payload && payload.new) {
                 const isOnline = payload.new.is_online;
                 chatStatusIndicator.textContent = isOnline ? 'Online' : 'Offline';
