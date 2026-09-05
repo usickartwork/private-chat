@@ -75,9 +75,17 @@ const optDeleteMe = document.getElementById('opt-delete-me');
 const optDeleteAll = document.getElementById('opt-delete-all');
 const optCancel = document.getElementById('opt-cancel');
 
-// Elemen Plus (+) Menu Pop-up di Obrolan
+// Elemen Plus (+) Menu Pop-up
 const btnToggleChatPlus = document.getElementById('btn-toggle-chat-plus');
 const chatPlusPopup = document.getElementById('chat-plus-popup');
+
+// Elemen Panggilan Jitsi API
+const btnStartAudioCall = document.getElementById('btn-start-audio-call');
+const btnStartVideoCall = document.getElementById('btn-start-video-call');
+const jitsiCallModal = document.getElementById('jitsi-call-modal');
+const callModalTitle = document.getElementById('call-modal-title');
+const btnEndCall = document.getElementById('btn-end-call');
+let jitsiApiInstance = null;
 
 // Elemen Game Tic-Tac-Toe
 const btnInviteGame = document.getElementById('btn-invite-game');
@@ -124,6 +132,7 @@ window.addEventListener('popstate', (event) => {
     if (gameModal) gameModal.classList.remove('active');
     if (musicModal) musicModal.classList.remove('active');
     if (musicAdminModal) musicAdminModal.classList.remove('active');
+    if (jitsiCallModal) endJitsiCall();
 
     if (chatScreen && chatScreen.classList.contains('active')) {
         closeChatRoomInternal(false);
@@ -191,7 +200,7 @@ if (btnRequestNotif) {
                 icon: 'https://cdn-icons-png.flaticon.com/512/1041/1041916.png'
             });
         } else if (permission === 'denied') {
-            alert('Izin notifikasi diblokir oleh browser. Buka setelan gembok/site settings di samping alamat URL browser kamu, lalu ubah izin Notifications menjadi "Allow" (Diizinkan).');
+            alert('Izin notifikasi diblokir oleh browser.');
         } else {
             alert('Permintaan izin notifikasi ditutup atau diabaikan.');
         }
@@ -343,7 +352,7 @@ if (btnAddFriend) {
         friendUsernameInput.value = '';
         homeError.style.color = '#28a745';
         homeError.textContent = 'Teman berhasil ditambahkan!';
-        loadFriends();
+ loadFriends();
     });
 }
 
@@ -392,9 +401,8 @@ async function loadFriends() {
             } else {
                 const prefix = msg.sender_id === currentUserId ? 'Kamu: ' : '';
                 let cleanMsg = msg.message;
-                if (cleanMsg.startsWith('[GAME_')) {
-                    cleanMsg = '🎮 [Undangan / Sesi Permainan Tic-Tac-Toe]';
-                }
+                if (cleanMsg.startsWith('[GAME_')) cleanMsg = '🎮 [Sesi Game]';
+                else if (cleanMsg.startsWith('[CALL_INVITE]')) cleanMsg = '📞 [Panggilan Telepon/Video]';
                 lastMsgText = prefix + cleanMsg;
             }
             const msgDate = new Date(msg.created_at);
@@ -555,9 +563,8 @@ async function markMessagesAsRead() {
 function showBrowserNotification(senderName, messageText) {
     if ('Notification' in window && Notification.permission === 'granted') {
         let cleanText = messageText;
-        if (cleanText && cleanText.startsWith('[GAME_')) {
-            cleanText = 'Mengajak / memperbarui permainan';
-        }
+        if (cleanText && cleanText.startsWith('[GAME_')) cleanText = 'Aktivitas game';
+        else if (cleanText && cleanText.startsWith('[CALL_INVITE]')) cleanText = 'Panggilan telepon/video masuk';
 
         if (navigator.serviceWorker && navigator.serviceWorker.controller) {
             navigator.serviceWorker.ready.then(registration => {
@@ -584,17 +591,25 @@ function appendMessage(msg) {
     if (msg.receiver_id === currentUserId && msg.deleted_for_receiver) return;
 
     let textToDisplay = msg.message;
+    let isCallCard = false;
     let isGameCard = false;
 
-    if (textToDisplay && textToDisplay.startsWith('[GAME_INVITE]:')) {
+    if (textToDisplay && textToDisplay.startsWith('[CALL_INVITE]:')) {
+        isCallCard = true;
+        const callType = textToDisplay.includes(':video') ? 'Video Call' : 'Panggilan Suara';
+        const isSender = msg.sender_id === currentUserId;
+        textToDisplay = isSender 
+            ? `📞 [${callType}] Kamu memulai panggilan.` 
+            : `📞 [${callType}] Memanggil kamu...`;
+    } else if (textToDisplay && textToDisplay.startsWith('[GAME_INVITE]:')) {
         isGameCard = true;
         const isSender = msg.sender_id === currentUserId;
         textToDisplay = isSender 
-            ? '🎮 [UNDANGAN GAME] Kamu menantang teman bermain Tic-Tac-Toe. Menunggu persetujuan (acc)...' 
+            ? '🎮 [UNDANGAN GAME] Kamu menantang teman bermain Tic-Tac-Toe.' 
             : '🎮 [UNDANGAN GAME] Teman mengajakmu bermain Tic-Tac-Toe!';
     } else if (textToDisplay && textToDisplay.startsWith('[GAME_START]:')) {
         isGameCard = true;
-        textToDisplay = '🎮 [GAME DIMULAI] Tantangan diterima! Permainan Tic-Tac-Toe sedang berlangsung.';
+        textToDisplay = '🎮 [GAME DIMULAI] Permainan Tic-Tac-Toe sedang berlangsung.';
     } else if (textToDisplay && textToDisplay.startsWith('[GAME_MOVE]:')) {
         textToDisplay = '🎮 [Langkah Permainan Tic-Tac-Toe]';
     }
@@ -614,6 +629,25 @@ function appendMessage(msg) {
     }
 
     let actionButtonContainer = null;
+    
+    // Tombol Gabung Panggilan untuk Penerima
+    if (isCallCard && !isOutgoing && !msg.is_deleted_for_all) {
+        actionButtonContainer = document.createElement('div');
+        actionButtonContainer.style.marginTop = '8px';
+        
+        const joinCallBtn = document.createElement('button');
+        joinCallBtn.textContent = 'Terima / Gabung Panggilan';
+        joinCallBtn.style.cssText = 'background: #28a745; color: #fff; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer;';
+        
+        joinCallBtn.addEventListener('click', () => {
+            const isVideo = msg.message.includes(':video');
+            const roomName = getCallRoomName(msg.sender_id, msg.receiver_id);
+            startJitsiCall(roomName, isVideo);
+        });
+        
+        actionButtonContainer.appendChild(joinCallBtn);
+    }
+
     if (isGameCard && msg.message.startsWith('[GAME_INVITE]:') && !isOutgoing) {
         actionButtonContainer = document.createElement('div');
         actionButtonContainer.style.marginTop = '8px';
@@ -634,6 +668,7 @@ function appendMessage(msg) {
         const repliedMsg = messageCache[msg.reply_to];
         let repText = repliedMsg.message;
         if (repText && repText.startsWith('[GAME_')) repText = '🎮 [Aktivitas Permainan]';
+        else if (repText && repText.startsWith('[CALL_INVITE]')) repText = '📞 [Panggilan]';
         const repliedSender = repliedMsg.sender_id === currentUserId ? 'Kamu' : `@${activeFriendName}`;
         replyHtml = `
             <div class="quoted-msg">
@@ -785,6 +820,82 @@ async function sendMessage() {
 if (btnSend) {
     btnSend.addEventListener('click', sendMessage);
 }
+
+// --- LOGIKA FITUR TELEPON / VIDEO CALL JITSI MEET ---
+function getCallRoomName(id1, id2) {
+    const sorted = [id1, id2].sort().join('-');
+    return `textinaja_call_${sorted}`;
+}
+
+async function initiateCall(isVideo = false) {
+    if (!activeFriendId) return;
+
+    const roomName = getCallRoomName(currentUserId, activeFriendId);
+    const callType = isVideo ? 'video' : 'audio';
+
+    // Kirim notifikasi panggilan ke chat lawan
+    await supabaseClient.from('messages').insert([{
+        sender_id: currentUserId,
+        receiver_id: activeFriendId,
+        message: `[CALL_INVITE]:${callType}`,
+        status: 'sent'
+    }]);
+
+    startJitsiCall(roomName, isVideo);
+}
+
+function startJitsiCall(roomName, isVideo = false) {
+    const domain = 'meet.jit.si';
+    const container = document.getElementById('jitsi-container');
+    container.innerHTML = '';
+
+    callModalTitle.textContent = isVideo ? `Video Call dengan @${activeFriendName}` : `Panggilan Suara dengan @${activeFriendName}`;
+    jitsiCallModal.classList.add('active');
+
+    const options = {
+        roomName: roomName,
+        width: '100%',
+        height: '100%',
+        parentNode: container,
+        userInfo: {
+            displayName: `@${currentUsername}`
+        },
+        configOverwrite: {
+            startWithAudioMuted: false,
+            startWithVideoMuted: !isVideo,
+            prejoinPageEnabled: false
+        },
+        interfaceConfigOverwrite: {
+            TOOLBAR_BUTTONS: [
+                'microphone', 'camera', 'closedcaptions', 'desktop', 'fullscreen',
+                'f当地', 'hangup', 'profile', 'chat', 'recording',
+                'livestreaming', 'etherpad', 'sharedvideo', 'settings', 'raisehand',
+                'videoquality', 'filmstrip', 'feedback', 'stats', 'shortcuts',
+                'tileview', 'videobackgroundblur', 'download', 'help', 'mute-everyone'
+            ]
+        }
+    };
+
+    jitsiApiInstance = new JitsiMeetExternalAPI(domain, options);
+
+    jitsiApiInstance.addEventListeners({
+        videoConferenceLeft: function () {
+            endJitsiCall();
+        }
+    });
+}
+
+function endJitsiCall() {
+    if (jitsiApiInstance) {
+        jitsiApiInstance.dispose();
+        jitsiApiInstance = null;
+    }
+    jitsiCallModal.classList.remove('active');
+}
+
+if (btnStartAudioCall) btnStartAudioCall.addEventListener('click', () => initiateCall(false));
+if (btnStartVideoCall) btnStartVideoCall.addEventListener('click', () => initiateCall(true));
+if (btnEndCall) btnEndCall.addEventListener('click', endJitsiCall);
 
 // --- LOGIKA TOGGLE MENU TAMBAHAN (+) DI OBROLAN ---
 if (btnToggleChatPlus) {
@@ -1052,7 +1163,7 @@ function handleIncomingGameMessage(msg) {
     }
 }
 
-// --- LOGIKA PEMUTAR MUSIK (SLIDER HALAMAN & DELETE FISIK SUPABASE STORAGE) ---
+// --- LOGIKA PEMUTAR MUSIK ---
 const ADMIN_PASSWORD = "admin123";
 
 const PIXEL_COVERS = {
@@ -1110,7 +1221,7 @@ let audioElement = new Audio();
 let isPlayingMusic = false;
 let isAdminAuthenticated = false;
 
-// Navigasi Slider Musik (0: Playlist, 1: Pemutar Musik)
+// Navigasi Slider Musik
 let currentSlideIndex = 1;
 
 function goToSlide(index) {
@@ -1294,7 +1405,7 @@ if (btnSaveNewSong) {
             renderAdminDeleteList();
             alert('Lagu berhasil diunggah ke database!');
         } catch(e) {
-            alert('Gagal mengunggah lagu. Pastikan bucket "music" di Supabase telah dibuat.');
+            alert('Gagal mengunggah lagu.');
             console.error(e);
         } finally {
             btnSaveNewSong.textContent = "Unggah ke Database";
@@ -1324,20 +1435,16 @@ function renderAdminDeleteList() {
     });
 }
 
-// PERBAIKAN: Hapus file fisik dari Storage + hapus dari Database
 async function deleteSongFromDB(song) {
-    if (confirm(`Yakin ingin menghapus lagu "${song.title}" dari database dan storage?`)) {
+    if (confirm(`Yakin ingin menghapus lagu "${song.title}"?`)) {
         try {
-            // Extrak nama file dari URL publik Supabase Storage
             const urlParts = song.src.split('/');
             const fileName = urlParts[urlParts.length - 1];
 
-            // 1. Hapus file audio dari Storage
             if (fileName) {
                 await supabaseClient.storage.from('music').remove([fileName]);
             }
 
-            // 2. Hapus metadata lagu dari tabel Database
             const { error } = await supabaseClient.from('songs').delete().eq('id', song.id);
             if (error) throw error;
 
