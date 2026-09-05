@@ -79,13 +79,31 @@ const optCancel = document.getElementById('opt-cancel');
 const btnToggleChatPlus = document.getElementById('btn-toggle-chat-plus');
 const chatPlusPopup = document.getElementById('chat-plus-popup');
 
-// Elemen Panggilan Jitsi API
+// --- ELEMEN & VARIABLE NATIVE WEBRTC ---
 const btnStartAudioCall = document.getElementById('btn-start-audio-call');
 const btnStartVideoCall = document.getElementById('btn-start-video-call');
-const jitsiCallModal = document.getElementById('jitsi-call-modal');
-const callModalTitle = document.getElementById('call-modal-title');
-const btnEndCall = document.getElementById('btn-end-call');
-let jitsiApiInstance = null;
+const webrtcCallModal = document.getElementById('webrtc-call-modal');
+const localVideo = document.getElementById('local-video');
+const remoteVideo = document.getElementById('remote-video');
+const callTargetName = document.getElementById('call-target-name');
+const callStatusText = document.getElementById('call-status-text');
+const btnEndWebRTCCall = document.getElementById('btn-end-webrtc-call');
+const btnToggleMic = document.getElementById('btn-toggle-mic');
+const btnToggleCam = document.getElementById('btn-toggle-cam');
+
+let localStream = null;
+let peerConnection = null;
+let signalingChannel = null;
+let isAudioOnlyCall = false;
+
+// Konfigurasi STUN/TURN Server Google & Metered.ca
+const iceServersConfig = {
+    iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' }
+    ]
+};
 
 // Elemen Game Tic-Tac-Toe
 const btnInviteGame = document.getElementById('btn-invite-game');
@@ -132,7 +150,7 @@ window.addEventListener('popstate', (event) => {
     if (gameModal) gameModal.classList.remove('active');
     if (musicModal) musicModal.classList.remove('active');
     if (musicAdminModal) musicAdminModal.classList.remove('active');
-    if (jitsiCallModal) endJitsiCall();
+    endWebRTCCall();
 
     if (chatScreen && chatScreen.classList.contains('active')) {
         closeChatRoomInternal(false);
@@ -352,7 +370,7 @@ if (btnAddFriend) {
         friendUsernameInput.value = '';
         homeError.style.color = '#28a745';
         homeError.textContent = 'Teman berhasil ditambahkan!';
- loadFriends();
+        loadFriends();
     });
 }
 
@@ -402,7 +420,7 @@ async function loadFriends() {
                 const prefix = msg.sender_id === currentUserId ? 'Kamu: ' : '';
                 let cleanMsg = msg.message;
                 if (cleanMsg.startsWith('[GAME_')) cleanMsg = '🎮 [Sesi Game]';
-                else if (cleanMsg.startsWith('[CALL_INVITE]')) cleanMsg = '📞 [Panggilan Telepon/Video]';
+                else if (cleanMsg.startsWith('[CALL_INVITE]')) cleanMsg = '📞 [Panggilan WebRTC]';
                 lastMsgText = prefix + cleanMsg;
             }
             const msgDate = new Date(msg.created_at);
@@ -483,6 +501,7 @@ async function openChatRoom(friendId, friendName, friendAvatar) {
     await markMessagesAsRead();
     subscribeToRealtime();
     setupTypingIndicator();
+    setupWebRTCSignaling();
 }
 
 async function checkPartnerIdStatus(friendId) {
@@ -525,6 +544,9 @@ function closeChatRoomInternal(pushHistory = true) {
     if (chatSubscription) supabaseClient.removeChannel(chatSubscription);
     if (profileStatusSubscription) supabaseClient.removeChannel(profileStatusSubscription);
     if (typingChannel) supabaseClient.removeChannel(typingChannel);
+    if (signalingChannel) supabaseClient.removeChannel(signalingChannel);
+    endWebRTCCall();
+
     chatScreen.classList.remove('active');
     homeScreen.classList.add('active');
     activeFriendId = null;
@@ -564,7 +586,7 @@ function showBrowserNotification(senderName, messageText) {
     if ('Notification' in window && Notification.permission === 'granted') {
         let cleanText = messageText;
         if (cleanText && cleanText.startsWith('[GAME_')) cleanText = 'Aktivitas game';
-        else if (cleanText && cleanText.startsWith('[CALL_INVITE]')) cleanText = 'Panggilan telepon/video masuk';
+        else if (cleanText && cleanText.startsWith('[CALL_INVITE]')) cleanText = 'Panggilan masuk';
 
         if (navigator.serviceWorker && navigator.serviceWorker.controller) {
             navigator.serviceWorker.ready.then(registration => {
@@ -599,7 +621,7 @@ function appendMessage(msg) {
         const callType = textToDisplay.includes(':video') ? 'Video Call' : 'Panggilan Suara';
         const isSender = msg.sender_id === currentUserId;
         textToDisplay = isSender 
-            ? `📞 [${callType}] Kamu memulai panggilan.` 
+            ? `📞 [${callType}] Memanggil...` 
             : `📞 [${callType}] Memanggil kamu...`;
     } else if (textToDisplay && textToDisplay.startsWith('[GAME_INVITE]:')) {
         isGameCard = true;
@@ -630,19 +652,17 @@ function appendMessage(msg) {
 
     let actionButtonContainer = null;
     
-    // Tombol Gabung Panggilan untuk Penerima
     if (isCallCard && !isOutgoing && !msg.is_deleted_for_all) {
         actionButtonContainer = document.createElement('div');
         actionButtonContainer.style.marginTop = '8px';
         
         const joinCallBtn = document.createElement('button');
-        joinCallBtn.textContent = 'Terima / Gabung Panggilan';
+        joinCallBtn.textContent = 'Angkat Panggilan';
         joinCallBtn.style.cssText = 'background: #28a745; color: #fff; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer;';
         
         joinCallBtn.addEventListener('click', () => {
             const isVideo = msg.message.includes(':video');
-            const roomName = getCallRoomName(msg.sender_id, msg.receiver_id);
-            startJitsiCall(roomName, isVideo);
+            answerWebRTCCall(isVideo);
         });
         
         actionButtonContainer.appendChild(joinCallBtn);
@@ -821,81 +841,167 @@ if (btnSend) {
     btnSend.addEventListener('click', sendMessage);
 }
 
-// --- LOGIKA FITUR TELEPON / VIDEO CALL JITSI MEET ---
-function getCallRoomName(id1, id2) {
-    const sorted = [id1, id2].sort().join('-');
-    return `textinaja_call_${sorted}`;
+// --- FITUR NATIVE WEBRTC + SUPABASE SIGNALING ---
+function setupWebRTCSignaling() {
+    if (signalingChannel) supabaseClient.removeChannel(signalingChannel);
+
+    const sortedRoomId = [currentUserId, activeFriendId].sort().join('-');
+    signalingChannel = supabaseClient.channel(`webrtc-${sortedRoomId}`, {
+        config: { broadcast: { self: false } }
+    });
+
+    signalingChannel
+        .on('broadcast', { event: 'signal' }, async payload => {
+            const data = payload.payload;
+            if (data.sender === currentUserId) return;
+
+            if (data.type === 'offer') {
+                callStatusText.textContent = 'Panggilan Masuk...';
+                showWebRTCUI(data.isVideo);
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+            } else if (data.type === 'answer') {
+                callStatusText.textContent = 'Terhubung!';
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+            } else if (data.type === 'ice-candidate') {
+                if (peerConnection && data.candidate) {
+                    await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                }
+            } else if (data.type === 'end-call') {
+                endWebRTCCall(false);
+            }
+        })
+        .subscribe();
 }
 
-async function initiateCall(isVideo = false) {
-    if (!activeFriendId) return;
-
-    const roomName = getCallRoomName(currentUserId, activeFriendId);
-    const callType = isVideo ? 'video' : 'audio';
-
-    // Kirim notifikasi panggilan ke chat lawan
-    await supabaseClient.from('messages').insert([{
-        sender_id: currentUserId,
-        receiver_id: activeFriendId,
-        message: `[CALL_INVITE]:${callType}`,
-        status: 'sent'
-    }]);
-
-    startJitsiCall(roomName, isVideo);
+function sendSignal(type, payloadData = {}) {
+    if (signalingChannel) {
+        signalingChannel.send({
+            type: 'broadcast',
+            event: 'signal',
+            payload: { sender: currentUserId, type, ...payloadData }
+        });
+    }
 }
 
-function startJitsiCall(roomName, isVideo = false) {
-    const domain = 'meet.jit.si';
-    const container = document.getElementById('jitsi-container');
-    container.innerHTML = '';
+async function createPeerConnection(isVideo) {
+    peerConnection = new RTCPeerConnection(iceServersConfig);
 
-    callModalTitle.textContent = isVideo ? `Video Call dengan @${activeFriendName}` : `Panggilan Suara dengan @${activeFriendName}`;
-    jitsiCallModal.classList.add('active');
-
-    const options = {
-        roomName: roomName,
-        width: '100%',
-        height: '100%',
-        parentNode: container,
-        userInfo: {
-            displayName: `@${currentUsername}`
-        },
-        configOverwrite: {
-            startWithAudioMuted: false,
-            startWithVideoMuted: !isVideo,
-            prejoinPageEnabled: false
-        },
-        interfaceConfigOverwrite: {
-            TOOLBAR_BUTTONS: [
-                'microphone', 'camera', 'closedcaptions', 'desktop', 'fullscreen',
-                'f当地', 'hangup', 'profile', 'chat', 'recording',
-                'livestreaming', 'etherpad', 'sharedvideo', 'settings', 'raisehand',
-                'videoquality', 'filmstrip', 'feedback', 'stats', 'shortcuts',
-                'tileview', 'videobackgroundblur', 'download', 'help', 'mute-everyone'
-            ]
+    peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+            sendSignal('ice-candidate', { candidate: event.candidate });
         }
     };
 
-    jitsiApiInstance = new JitsiMeetExternalAPI(domain, options);
+    peerConnection.ontrack = (event) => {
+        if (remoteVideo.srcObject !== event.streams[0]) {
+            remoteVideo.srcObject = event.streams[0];
+            callStatusText.textContent = 'Terhubung!';
+        }
+    };
 
-    jitsiApiInstance.addEventListeners({
-        videoConferenceLeft: function () {
-            endJitsiCall();
+    try {
+        localStream = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+            video: isVideo
+        });
+        localVideo.srcObject = localStream;
+        localVideo.style.display = isVideo ? 'block' : 'none';
+
+        localStream.getTracks().forEach(track => {
+            peerConnection.addTrack(track, localStream);
+        });
+    } catch (err) {
+        alert('Gagal mengakses Mikrofon/Kamera. Pastikan aplikasi berjalan di HTTPS.');
+        endWebRTCCall();
+    }
+}
+
+function showWebRTCUI(isVideo) {
+    callTargetName.textContent = `@${activeFriendName}`;
+    callStatusText.textContent = 'Menghubungkan...';
+    webrtcCallModal.classList.add('active');
+    btnToggleCam.style.display = isVideo ? 'block' : 'none';
+}
+
+async function startWebRTCCall(isVideo = false) {
+    if (!activeFriendId) return;
+    isAudioOnlyCall = !isVideo;
+    showWebRTCUI(isVideo);
+
+    await createPeerConnection(isVideo);
+
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+
+    sendSignal('offer', { offer, isVideo });
+
+    // Kirim pesan tercatat di database chat
+    await supabaseClient.from('messages').insert([{
+        sender_id: currentUserId,
+        receiver_id: activeFriendId,
+        message: `[CALL_INVITE]:${isVideo ? 'video' : 'audio'}`,
+        status: 'sent'
+    }]);
+}
+
+async function answerWebRTCCall(isVideo = false) {
+    showWebRTCUI(isVideo);
+    await createPeerConnection(isVideo);
+
+    const answer = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer);
+
+    sendSignal('answer', { answer });
+}
+
+function endWebRTCCall(notifyPeer = true) {
+    if (notifyPeer) {
+        sendSignal('end-call');
+    }
+
+    if (peerConnection) {
+        peerConnection.close();
+        peerConnection = null;
+    }
+
+    if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+    }
+
+    if (localVideo) localVideo.srcObject = null;
+    if (remoteVideo) remoteVideo.srcObject = null;
+
+    webrtcCallModal.classList.remove('active');
+}
+
+if (btnStartAudioCall) btnStartAudioCall.addEventListener('click', () => startWebRTCCall(false));
+if (btnStartVideoCall) btnStartVideoCall.addEventListener('click', () => startWebRTCCall(true));
+if (btnEndWebRTCCall) btnEndWebRTCCall.addEventListener('click', () => endWebRTCCall(true));
+
+if (btnToggleMic) {
+    btnToggleMic.addEventListener('click', () => {
+        if (localStream) {
+            const audioTrack = localStream.getAudioTracks()[0];
+            if (audioTrack) {
+                audioTrack.enabled = !audioTrack.enabled;
+                btnToggleMic.style.background = audioTrack.enabled ? '#333' : '#dc3545';
+            }
         }
     });
 }
 
-function endJitsiCall() {
-    if (jitsiApiInstance) {
-        jitsiApiInstance.dispose();
-        jitsiApiInstance = null;
-    }
-    jitsiCallModal.classList.remove('active');
+if (btnToggleCam) {
+    btnToggleCam.addEventListener('click', () => {
+        if (localStream) {
+            const videoTrack = localStream.getVideoTracks()[0];
+            if (videoTrack) {
+                videoTrack.enabled = !videoTrack.enabled;
+                btnToggleCam.style.background = videoTrack.enabled ? '#333' : '#dc3545';
+            }
+        }
+    });
 }
-
-if (btnStartAudioCall) btnStartAudioCall.addEventListener('click', () => initiateCall(false));
-if (btnStartVideoCall) btnStartVideoCall.addEventListener('click', () => initiateCall(true));
-if (btnEndCall) btnEndCall.addEventListener('click', endJitsiCall);
 
 // --- LOGIKA TOGGLE MENU TAMBAHAN (+) DI OBROLAN ---
 if (btnToggleChatPlus) {
@@ -1190,14 +1296,12 @@ const playlistContainer = document.getElementById('playlist-container');
 const musicWaves = document.getElementById('music-waves');
 const pixelSvgContainer = document.getElementById('pixel-svg-container');
 
-// Elemen Slider & Dots
 const musicSlider = document.getElementById('music-slider');
 const musicSliderWrapper = document.getElementById('music-slider-wrapper');
 const dotPlaylist = document.getElementById('dot-playlist');
 const dotPlayer = document.getElementById('dot-player');
 const musicModalTitle = document.getElementById('music-modal-title');
 
-// Modal Admin
 const btnOpenAdminMusic = document.getElementById('btn-open-admin-music');
 const musicAdminModal = document.getElementById('music-admin-modal');
 const btnCloseAdminMusic = document.getElementById('btn-close-admin-music');
@@ -1206,7 +1310,6 @@ const adminPanelSection = document.getElementById('admin-panel-section');
 const adminPassInput = document.getElementById('admin-pass-input');
 const btnVerifyAdmin = document.getElementById('btn-verify-admin');
 
-// Form Admin Inputs
 const addSongTitle = document.getElementById('add-song-title');
 const addSongArtist = document.getElementById('add-song-artist');
 const adminAudioInput = document.getElementById('admin-audio-input');
@@ -1221,7 +1324,6 @@ let audioElement = new Audio();
 let isPlayingMusic = false;
 let isAdminAuthenticated = false;
 
-// Navigasi Slider Musik
 let currentSlideIndex = 1;
 
 function goToSlide(index) {
@@ -1242,7 +1344,6 @@ function goToSlide(index) {
 if (dotPlaylist) dotPlaylist.addEventListener('click', () => goToSlide(0));
 if (dotPlayer) dotPlayer.addEventListener('click', () => goToSlide(1));
 
-// Deteksi Geser/Swipe Touch
 let touchStartX = 0;
 let touchEndX = 0;
 
@@ -1266,7 +1367,6 @@ function handleSwipe() {
     }
 }
 
-// Pilih Desain Pixel Cover
 pixelCoverOptions.forEach(opt => {
     opt.addEventListener('click', () => {
         pixelCoverOptions.forEach(o => o.classList.remove('selected'));
@@ -1275,7 +1375,6 @@ pixelCoverOptions.forEach(opt => {
     });
 });
 
-// Ambil Playlist dari Supabase Database
 async function fetchPublicPlaylist() {
     const { data: songs, error } = await supabaseClient
         .from('songs')
@@ -1293,7 +1392,6 @@ async function fetchPublicPlaylist() {
 
 fetchPublicPlaylist();
 
-// Realtime Sync Musik
 supabaseClient
     .channel('public:songs')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'songs' }, () => {
@@ -1355,7 +1453,6 @@ function showAdminPanel() {
     renderAdminDeleteList();
 }
 
-// Upload File Lagu ke Storage & Simpan Metadata ke Supabase
 if (btnSaveNewSong) {
     btnSaveNewSong.addEventListener('click', async () => {
         const title = addSongTitle.value.trim();
