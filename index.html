@@ -2,704 +2,1109 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Textinaja - Private Chat</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#000000">
-
-    <!-- OneSignal Web SDK v16 -->
-    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-    <script>
-      window.OneSignalDeferred = window.OneSignalDeferred || [];
-      OneSignalDeferred.push(async function(OneSignal) {
-        await OneSignal.init({
-          appId: "ff3838e1-c0bc-43d7-8c90-e5ba7643a842",
-        });
-      });
-    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Textinaja - Aplikasi Chat & Panggilan</title>
+    
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- PeerJS CDN untuk Panggilan Suara & Video Stabil -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
     <style>
-        .profile-menu-list {
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: #121212;
+            color: #e0e0e0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .screen {
+            display: none;
             width: 100%;
-            margin-top: 24px;
+            max-width: 480px;
+            height: 100%;
+            background: #181818;
+            flex-direction: column;
+            position: relative;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        /* --- AUTH SCREEN --- */
+        .auth-container {
+            padding: 40px 24px;
             display: flex;
             flex-direction: column;
-            gap: 12px;
-            padding: 0 16px;
+            justify-content: center;
+            height: 100%;
         }
-        .profile-menu-item {
+
+        .auth-title {
+            font-size: 28px;
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+
+        .auth-subtitle {
+            font-size: 14px;
+            color: #888;
+            margin-bottom: 32px;
+            text-align: center;
+        }
+
+        .input-group {
+            margin-bottom: 16px;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 12px;
+            color: #aaa;
+            margin-bottom: 6px;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 12px 16px;
+            background: #242424;
+            border: 1px solid #333;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .input-group input:focus {
+            border-color: #1db954;
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 12px;
+            background: #1db954;
+            color: #121212;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            margin-top: 8px;
+            transition: background 0.2s;
+        }
+
+        .btn-primary:hover {
+            background: #1ed760;
+        }
+
+        .auth-switch {
+            text-align: center;
+            margin-top: 24px;
+            font-size: 13px;
+            color: #888;
+        }
+
+        .auth-switch span {
+            color: #1db954;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .error-msg {
+            color: #ff5555;
+            font-size: 12px;
+            text-align: center;
+            margin-top: 12px;
+        }
+
+        /* --- HEADER UMUM --- */
+        .app-header {
+            padding: 16px 20px;
+            background: #202020;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 14px 16px;
-            background: #f8f9fa;
-            border-radius: 12px;
-            font-size: 14px;
-            font-weight: 500;
-            color: #333;
-            border: none;
+            border-bottom: 1px solid #282828;
+        }
+
+        .header-profile {
+            display: flex;
+            align-items: center;
+            gap: 12px;
             cursor: pointer;
-            text-align: left;
+        }
+
+        .avatar-circle {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #fff;
+            overflow: hidden;
+            font-size: 14px;
+        }
+
+        .avatar-circle img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .header-username {
+            font-size: 14px;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .icon-btn {
+            background: none;
+            border: none;
+            color: #aaa;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 50%;
+            transition: color 0.2s, background 0.2s;
+        }
+
+        .icon-btn:hover {
+            color: #fff;
+            background: rgba(255,255,255,0.05);
+        }
+
+        /* --- HOME SCREEN --- */
+        .home-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .add-friend-section {
+            padding: 16px 20px;
+            background: #1f1f1f;
+            border-bottom: 1px solid #282828;
+        }
+
+        .add-friend-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .add-friend-row input {
+            flex: 1;
+            padding: 10px 14px;
+            background: #2a2a2a;
+            border: 1px solid #333;
+            border-radius: 6px;
+            color: #fff;
+            font-size: 13px;
+            outline: none;
+        }
+
+        .add-friend-row button {
+            padding: 0 16px;
+            background: #fff;
+            color: #121212;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .friends-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .friend-item {
+            display: flex;
+            align-items: center;
+            padding: 14px 20px;
+            gap: 14px;
+            cursor: pointer;
+            border-bottom: 1px solid #222;
+            transition: background 0.2s;
+        }
+
+        .friend-item:hover {
+            background: #202020;
+        }
+
+        .friend-item.unread {
+            background: rgba(29, 185, 84, 0.05);
+        }
+
+        .friend-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .friend-top-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+
+        .friend-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .friend-time {
+            font-size: 11px;
+            color: #777;
+        }
+
+        .friend-bottom-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .friend-last-msg {
+            font-size: 12px;
+            color: #888;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 220px;
+        }
+
+        .unread-badge {
+            background: #1db954;
+            color: #121212;
+            font-size: 10px;
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 10px;
+        }
+
+        /* --- PROFILE SCREEN --- */
+        .profile-container {
+            padding: 30px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+        }
+
+        .profile-avatar-wrapper {
+            position: relative;
+            margin-bottom: 16px;
+            cursor: pointer;
+        }
+
+        .profile-large-avatar {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            background: #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            font-weight: bold;
+            color: #fff;
+            overflow: hidden;
+            border: 2px solid #444;
+        }
+
+        .profile-large-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .camera-overlay {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            background: #1db954;
+            color: #121212;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            border: 2px solid #181818;
+        }
+
+        .profile-username {
+            font-size: 18px;
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 24px;
+        }
+
+        .profile-menu-list {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .profile-menu-item {
+            padding: 14px 16px;
+            background: #222;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #ccc;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .profile-menu-item:hover {
+            background: #282828;
+            color: #fff;
+        }
+
+        /* --- CHAT SCREEN --- */
+        .chat-header {
+            padding: 12px 16px;
+            background: #202020;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #282828;
+        }
+
+        .chat-header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .chat-header-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-partner-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .chat-status {
+            font-size: 11px;
+            color: #888;
+        }
+
+        .chat-header-right {
+            display: flex;
+            gap: 8px;
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            background: #121212;
+        }
+
+        .message-wrapper {
+            display: flex;
             width: 100%;
         }
-        .profile-menu-item.danger {
-            color: #dc3545;
-            background: #fff5f5;
+
+        .message-wrapper.outgoing {
+            justify-content: flex-end;
         }
-        /* Modal Add Friend Pop-up */
-        .add-friend-modal {
+
+        .message-wrapper.incoming {
+            justify-content: flex-start;
+        }
+
+        .message-item {
+            max-width: 75%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 13px;
+            line-height: 1.4;
+            position: relative;
+            word-break: break-word;
+        }
+
+        .message-item.outgoing {
+            background: #1db954;
+            color: #121212;
+            border-top-right-radius: 2px;
+        }
+
+        .message-item.incoming {
+            background: #262626;
+            color: #e0e0e0;
+            border-top-left-radius: 2px;
+        }
+
+        .quoted-msg {
+            background: rgba(0,0,0,0.15);
+            padding: 6px 10px;
+            border-left: 3px solid rgba(255,255,255,0.7);
+            border-radius: 4px;
+            margin-bottom: 6px;
+            font-size: 11px;
+        }
+
+        .quoted-sender {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 2px;
+        }
+
+        .msg-footer {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 4px;
+            margin-top: 4px;
+            font-size: 10px;
+            color: rgba(255,255,255,0.6);
+        }
+
+        .message-item.incoming .msg-footer {
+            color: #888;
+        }
+
+        .msg-status.read {
+            color: #0056b3;
+            font-weight: bold;
+        }
+
+        /* Input Chat Area */
+        .chat-input-area {
+            background: #202020;
+            padding: 10px 16px;
+            display: flex;
+            flex-direction: column;
+            border-top: 1px solid #282828;
+            position: relative;
+        }
+
+        .reply-preview-box {
             display: none;
-            position: fixed;
+            background: #262626;
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            border-left: 3px solid #1db954;
+        }
+
+        .reply-preview-box.active {
+            display: flex;
+        }
+
+        .chat-input-row {
+            display: flex;
+            align-items: flex-end;
+            gap: 10px;
+        }
+
+        .chat-input-row textarea {
+            flex: 1;
+            padding: 10px 14px;
+            background: #2a2a2a;
+            border: 1px solid #333;
+            border-radius: 20px;
+            color: #fff;
+            font-size: 13px;
+            outline: none;
+            resize: none;
+            max-height: 100px;
+            line-height: 1.4;
+        }
+
+        .btn-send {
+            background: #1db954;
+            color: #121212;
+            border: none;
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-weight: bold;
+            flex-shrink: 0;
+            transition: background 0.2s;
+        }
+
+        .btn-send:hover {
+            background: #1ed760;
+        }
+
+        .btn-plus-menu {
+            background: none;
+            border: none;
+            color: #aaa;
+            font-size: 22px;
+            cursor: pointer;
+            width: 38px;
+            height: 38px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: color 0.2s, transform 0.2s;
+        }
+
+        .btn-plus-menu.active {
+            transform: rotate(45deg);
+            color: #1db954;
+        }
+
+        .chat-plus-popup {
+            position: absolute;
+            bottom: 65px;
+            left: 16px;
+            background: #242424;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 8px;
+            display: none;
+            flex-direction: column;
+            gap: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            z-index: 10;
+            min-width: 160px;
+        }
+
+        .chat-plus-popup.active {
+            display: flex;
+        }
+
+        .popup-menu-item {
+            padding: 10px 12px;
+            background: transparent;
+            border: none;
+            color: #ccc;
+            font-size: 12px;
+            text-align: left;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .popup-menu-item:hover {
+            background: #2e2e2e;
+            color: #fff;
+        }
+
+        /* --- WEBRTC CALL MODAL --- */
+        .webrtc-call-modal {
+            position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.5);
-            justify-content: center;
-            align-items: center;
+            background: #000;
             z-index: 100;
-        }
-        .add-friend-modal.active {
-            display: flex;
-        }
-        .add-friend-dialog {
-            background: white;
-            width: 90%;
-            max-width: 360px;
-            padding: 20px;
-            border-radius: 12px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-        }
-
-        /* --- EFEK GLOW & GAYA MONOKROMATIK HITAM --- */
-        .glow-header {
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
-        }
-        
-        .glow-title {
-            text-shadow: 0 0 10px rgba(255, 255, 255, 0.6), 0 0 20px rgba(0, 0, 0, 0.4);
-        }
-
-        #search-contact-input:focus {
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
-            background: #ffffff !important;
-        }
-
-        .btn.primary, button.primary {
-            background: #000000 !important;
-            border-color: #000000 !important;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-            transition: all 0.2s ease;
-        }
-        .btn.primary:hover, button.primary:hover {
-            background: #212529 !important;
-            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
-        }
-
-        .card {
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08), 0 0 15px rgba(0, 0, 0, 0.05);
-        }
-
-        /* Tombol SVG Pemutar Musik */
-        .svg-btn {
-            background: none;
-            border: none;
-            color: #b3b3b3;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: color 0.2s;
-        }
-        .svg-btn:hover {
-            color: #ffffff;
-        }
-        .svg-btn-main {
-            background: #ffffff;
-            color: #000000;
-            border: none;
-            width: 44px;
-            height: 44px;
-            border-radius: 50%;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 12px rgba(255,255,255,0.2);
-            transition: transform 0.1s ease;
-        }
-        .svg-btn-main:active {
-            transform: scale(0.95);
-        }
-
-        /* Pixel Art Radio Styles */
-        .pixel-cover-option {
-            border: 2px solid transparent;
-            border-radius: 8px;
-            padding: 4px;
-            cursor: pointer;
-            background: #181818;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .pixel-cover-option.selected {
-            border-color: #1db954;
-            background: #282828;
-        }
-
-        /* --- STYLES SLIDER MODAL MUSIK --- */
-        .music-slider-container {
-            display: flex;
-            width: 200%;
-            transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
-        }
-        .music-slide {
-            width: 50%;
-            flex-shrink: 0;
-            box-sizing: border-box;
-        }
-        .music-dots-indicator {
-            display: flex;
-            justify-content: center;
-            gap: 6px;
-            margin-bottom: 12px;
-        }
-        .music-dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: #444;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        .music-dot.active {
-            background: #fff;
-            width: 16px;
-            border-radius: 10px;
-        }
-
-        /* --- STYLES POPUP MENU TAMBAHAN (+) DI CHAT INPUT --- */
-        .chat-action-menu-container {
-            position: relative;
-            display: flex;
-            align-items: center;
-        }
-        .btn-plus-action {
-            background: #f1f3f5;
-            color: #111;
-            border: none;
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            font-size: 20px;
-            font-weight: 300;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.2s;
-            flex-shrink: 0;
-            margin-right: 8px;
-        }
-        .btn-plus-action.active {
-            transform: rotate(45deg);
-            background: #e9ecef;
-            color: #dc3545;
-        }
-        .chat-plus-popup {
-            position: absolute;
-            bottom: 48px;
-            left: 0;
-            background: #ffffff;
-            border: 1px solid #e2e8f0;
-            border-radius: 14px;
-            padding: 8px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            min-width: 140px;
-            opacity: 0;
-            visibility: hidden;
-            transform: translateY(12px) scale(0.9);
-            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            z-index: 50;
-        }
-        .chat-plus-popup.active {
-            opacity: 1;
-            visibility: visible;
-            transform: translateY(0) scale(1);
-        }
-        .popup-action-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 8px 12px;
-            border: none;
-            background: transparent;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 600;
-            color: #111;
-            cursor: pointer;
-            text-align: left;
-            transition: background 0.15s;
-        }
-        .popup-action-item:hover {
-            background: #f8f9fa;
-        }
-
-        /* --- STYLES HEADER CALL BUTTONS --- */
-        .call-btn-group {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-left: auto;
-            padding-right: 4px;
-        }
-        .call-icon-btn {
-            background: none;
-            border: none;
-            color: #333;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 6px;
-            border-radius: 50%;
-            transition: background 0.2s;
-        }
-        .call-icon-btn:hover {
-            background: rgba(0, 0, 0, 0.05);
-        }
-
-        /* --- WEBRTC CALL LAYOUT --- */
-        #webrtc-call-modal {
             display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: #111;
-            z-index: 3000;
             flex-direction: column;
             justify-content: space-between;
-            align-items: center;
-            padding: 24px 16px;
-            box-sizing: border-box;
+            padding: 30px 20px;
         }
-        #webrtc-call-modal.active {
+
+        .webrtc-call-modal.active {
             display: flex;
         }
-        .video-container {
+
+        .call-header-info {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .call-target-name {
+            font-size: 20px;
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+
+        .call-status-text {
+            font-size: 13px;
+            color: #1db954;
+        }
+
+        .call-video-container {
+            flex: 1;
             position: relative;
-            width: 100%;
-            max-width: 480px;
-            height: 60vh;
-            background: #000;
-            border-radius: 16px;
+            margin: 20px 0;
+            background: #111;
+            border-radius: 12px;
             overflow: hidden;
             display: flex;
             align-items: center;
             justify-content: center;
         }
+
         #remote-video {
             width: 100%;
             height: 100%;
             object-fit: cover;
         }
+
         #local-video {
             position: absolute;
-            top: 12px; right: 12px;
-            width: 100px; height: 140px;
-            object-fit: cover;
-            border-radius: 12px;
-            border: 2px solid #fff;
+            bottom: 16px;
+            right: 16px;
+            width: 100px;
+            height: 140px;
             background: #222;
+            border-radius: 8px;
+            object-fit: cover;
+            border: 2px solid #444;
+            display: none;
         }
+
+        .call-actions {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .call-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            cursor: pointer;
+        }
+
+        .btn-end-call {
+            background: #ff4d4d;
+            color: #fff;
+            width: 60px;
+            height: 60px;
+            font-size: 22px;
+        }
+
+        .btn-ctrl {
+            background: #333;
+            color: #fff;
+        }
+
+        /* --- MINI GAME MODAL --- */
+        .game-modal {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            z-index: 50;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .game-modal.active { display: flex; }
+        .game-board {
+            display: grid;
+            grid-template-columns: repeat(3, 80px);
+            grid-template-rows: repeat(3, 80px);
+            gap: 6px;
+            margin: 20px 0;
+        }
+        .game-cell {
+            background: #242424;
+            border: 1px solid #333;
+            border-radius: 8px;
+            font-size: 32px;
+            font-weight: bold;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .game-cell:hover { background: #2e2e2e; }
+
+        /* --- MUSIC PLAYER MODAL --- */
+        .music-modal {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #141414;
+            z-index: 50;
+            display: none;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+        }
+        .music-modal.active { display: flex; }
+
+        /* --- MODAL PILIHAN PESAN --- */
+        .modal-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 40;
+            display: none;
+            justify-content: center;
+            align-items: flex-end;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-sheet {
+            background: #202020;
+            width: 100%;
+            border-top-left-radius: 16px;
+            border-top-right-radius: 16px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .modal-btn {
+            padding: 12px;
+            background: #282828;
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 13px;
+            text-align: center;
+            cursor: pointer;
+        }
+        .modal-btn:hover { background: #333; }
+        .modal-btn.danger { color: #ff5555; }
     </style>
 </head>
 <body>
-    <!-- 1. SCREEN: LOGIN -->
-    <div id="login-screen" class="screen active">
-        <div class="card">
-            <h2>Masuk</h2>
-            <p class="subtitle">Silakan masuk dengan akun kamu</p>
+
+    <!-- 1. LOGIN SCREEN -->
+    <div id="login-screen" class="screen">
+        <div class="auth-container">
+            <h1 class="auth-title">Textinaja</h1>
+            <p class="auth-subtitle">Masuk untuk mulai mengobrol</p>
             
-            <div class="form-group">
-                <label for="login-username">Username</label>
-                <input type="text" id="login-username" placeholder="Masukkan username" autocomplete="off">
+            <div class="input-group">
+                <label>Username</label>
+                <input type="text" id="login-username" placeholder="Masukkan username">
             </div>
-            <div class="form-group">
-                <label for="login-password">Password</label>
+            <div class="input-group">
+                <label>Password</label>
                 <input type="password" id="login-password" placeholder="Masukkan password">
             </div>
-            <button id="btn-login" class="btn primary">Masuk</button>
-            <p id="login-error" class="error"></p>
             
-            <p class="switch-auth">Belum punya akun? <span id="to-register">Buat Akun</span></p>
+            <button id="btn-login" class="btn-primary">Masuk</button>
+            <div id="login-error" class="error-msg"></div>
+
+            <div class="auth-switch">
+                Belum punya akun? <span id="to-register">Daftar di sini</span>
+            </div>
         </div>
     </div>
 
-    <!-- 2. SCREEN: REGISTER -->
+    <!-- 2. REGISTER SCREEN -->
     <div id="register-screen" class="screen">
-        <div class="card">
-            <h2>Buat Akun</h2>
-            <p class="subtitle">Daftarkan username dan password kamu</p>
+        <div class="auth-container">
+            <h1 class="auth-title">Buat Akun</h1>
+            <p class="auth-subtitle">Daftar akun Textinaja baru</p>
             
-            <div class="form-group">
-                <label for="reg-username">Username</label>
-                <input type="text" id="reg-username" placeholder="Pilih username unik" autocomplete="off">
+            <div class="input-group">
+                <label>Username</label>
+                <input type="text" id="reg-username" placeholder="Buat username unik">
             </div>
-            <div class="form-group">
-                <label for="reg-password">Password</label>
+            <div class="input-group">
+                <label>Password</label>
                 <input type="password" id="reg-password" placeholder="Buat password">
             </div>
-            <div class="form-group">
-                <label for="reg-confirm-password">Konfirmasi Password</label>
+            <div class="input-group">
+                <label>Konfirmasi Password</label>
                 <input type="password" id="reg-confirm-password" placeholder="Ulangi password">
             </div>
-            <button id="btn-register" class="btn primary">Daftar</button>
-            <p id="reg-error" class="error"></p>
             
-            <p class="switch-auth">Sudah punya akun? <span id="to-login">Masuk</span></p>
+            <button id="btn-register" class="btn-primary">Daftar</button>
+            <div id="reg-error" class="error-msg"></div>
+
+            <div class="auth-switch">
+                Sudah punya akun? <span id="to-login">Masuk di sini</span>
+            </div>
         </div>
     </div>
 
-    <!-- 3. SCREEN: HOME / CONTACT LIST -->
+    <!-- 3. HOME SCREEN -->
     <div id="home-screen" class="screen">
-        <div class="glow-header" style="padding: 20px 16px 20px 16px; background: #000000; border-bottom: 1px solid #212529; display: flex; flex-direction: column; gap: 12px;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <button id="btn-open-profile" style="background: none; border: none; cursor: pointer; padding: 0; display: flex; align-items: center; flex-shrink: 0; margin-left: 6px;">
-                    <div id="my-header-avatar" class="friend-avatar header-profile-btn" style="width: 52px; height: 52px; font-size: 18px; border: 3px solid #ffffff; box-shadow: 0 4px 14px rgba(0,0,0,0.4);">-</div>
-                </button>
+        <div class="app-header">
+            <div class="header-profile" id="btn-open-profile">
+                <div class="avatar-circle" id="my-header-avatar">?</div>
+                <span class="header-username" id="my-profile-name">@User</span>
+            </div>
+            <div class="header-actions">
+                <button class="icon-btn" id="btn-logout" title="Keluar">⎋</button>
+            </div>
+        </div>
 
-                <div style="display: flex; flex-direction: column; align-items: center; text-align: center; flex: 1; gap: 2px; padding: 0 4px;">
-                    <span style="font-size: 9px; font-weight: 700; letter-spacing: 2px; color: #a3a3a3; text-transform: uppercase;">Encrypted Network</span>
-                    <h1 class="glow-title" style="font-size: 18px; font-weight: bold; color: #ffffff; margin: 0; line-height: 1.1; letter-spacing: 1px;">CHAT MESSENGER</h1>
-                    <span id="my-profile-name" style="font-size: 11px; color: #737373; max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">-</span>
+        <div class="home-content">
+            <div class="add-friend-section">
+                <div class="add-friend-row">
+                    <input type="text" id="friend-username-input" placeholder="Cari username teman...">
+                    <button id="btn-add-friend">Tambah</button>
                 </div>
-
-                <div style="width: 52px;"></div>
+                <div id="home-error" class="error-msg" style="text-align: left; margin-top: 6px;"></div>
             </div>
-            <div style="position: relative; margin-top: 4px;">
-                <input type="text" id="search-contact-input" placeholder="Cari kontak atau pesan..." autocomplete="off" style="width: 100%; padding: 10px 14px 10px 36px; border: none; border-radius: 20px; font-size: 13px; outline: none; background: #f8f9fa; color: #333; transition: all 0.2s ease;">
-                <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 13px; color: #adb5bd;">🔍</span>
-            </div>
-        </div>
 
-        <div style="padding: 12px 16px 4px 16px;">
-            <p style="font-size: 12px; color: #868e96; margin: 0; font-weight: 500;">Daftar kontak</p>
-        </div>
-
-        <div id="friends-list" class="friends-list"></div>
-
-        <div class="floating-center-action">
-            <button id="btn-open-add-friend-modal" class="floating-add-btn">
-                <span>＋</span>
-            </button>
-        </div>
-    </div>
-
-    <!-- MODAL POPUP TAMBAH TEMAN -->
-    <div id="add-friend-modal" class="add-friend-modal">
-        <div class="add-friend-dialog">
-            <h3 style="font-size: 16px; color: #333; margin-bottom: 4px;">Tambah Teman Baru</h3>
-            <p style="font-size: 12px; color: #666; margin-bottom: 8px;">Masukkan username teman yang ingin kamu tambahkan.</p>
-            <input type="text" id="friend-username-input" placeholder="Cari username..." autocomplete="off" style="padding: 10px 12px; border: 1px solid #ced4da; border-radius: 6px; font-size: 13px; outline: none;">
-            <p id="home-error" class="error-small" style="text-align: left; margin: 0;"></p>
-            <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px;">
-                <button id="btn-close-add-friend-modal" class="btn" style="background: #e9ecef; color: #495057; width: auto; padding: 8px 14px; font-size: 13px;">Batal</button>
-                <button id="btn-add-friend" class="btn primary" style="width: auto; padding: 8px 16px; font-size: 13px;">Tambah</button>
+            <div class="friends-list" id="friends-list">
+                <!-- Daftar Kontak Teman -->
             </div>
         </div>
     </div>
 
-    <!-- 4. SCREEN: PROFILE & SETTINGS -->
+    <!-- 4. PROFILE SCREEN -->
     <div id="profile-screen" class="screen">
-        <div class="chat-header">
-            <button id="btn-back-profile" class="btn-icon">←</button>
-            <div class="chat-info">
-                <h3>Profil & Pengaturan</h3>
-            </div>
+        <div class="app-header">
+            <button class="icon-btn" id="btn-back-profile">←</button>
+            <span class="header-username">Profil Saya</span>
+            <div style="width: 24px;"></div>
         </div>
-        <div class="card" style="align-items: center; text-align: center; justify-content: flex-start; padding-top: 20px; overflow-y: auto;">
-            <div id="profile-pic-container" style="position: relative; margin-bottom: 12px; cursor: pointer;">
-                <div id="profile-large-avatar" class="friend-avatar" style="width: 80px; height: 80px; font-size: 32px;">-</div>
-                <img id="profile-large-img" style="display: none; width: 80px; height: 80px; border-radius: 50%; object-fit: cover;" />
+        <div class="profile-container">
+            <div class="profile-avatar-wrapper" id="btn-change-photo">
+                <div class="profile-large-avatar" id="profile-large-avatar">?</div>
+                <img id="profile-large-img" style="display: none; width: 90px; height: 90px; border-radius: 50%; object-fit: cover;" />
+                <div class="camera-overlay">📷</div>
             </div>
             <input type="file" id="avatar-file-input" accept="image/*" style="display: none;">
-            <button id="btn-change-photo" class="btn primary" style="width: auto; padding: 6px 14px; font-size: 12px;">Ganti Foto Profil</button>
-            <p id="profile-status" class="error-small" style="color: #28a745; margin-top: 4px;"></p>
             
+            <div class="profile-username" id="profile-display-username">@User</div>
+            <div id="profile-status" style="font-size: 12px; margin-bottom: 20px; color: #888;"></div>
+
             <div class="profile-menu-list">
-                <button id="btn-request-notif" class="profile-menu-item" style="background: #f1f3f5; color: #111;">
-                    <span>🔔 Aktifkan Notifikasi Pesan</span>
+                <div class="profile-menu-item" id="btn-request-notif">
+                    <span>🔔 Aktifkan Notifikasi Push</span>
                     <span>→</span>
-                </button>
-                <button id="btn-logout" class="profile-menu-item danger">
-                    <span>Keluar (Logout)</span>
-                    <span>→</span>
-                </button>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- 5. SCREEN: CHAT ROOM -->
+    <!-- 5. CHAT SCREEN -->
     <div id="chat-screen" class="screen">
         <div class="chat-header">
-            <button id="btn-back" class="btn-icon">←</button>
-            <div id="chat-partner-avatar-container" class="friend-avatar" style="width: 38px; height: 38px; font-size: 15px; flex-shrink: 0;">-</div>
-            <div class="chat-info" style="flex: 1;">
-                <div>
-                    <h3 id="chat-partner-name">Nama Teman</h3>
-                    <span id="chat-status-indicator">Online</span>
+            <div class="chat-header-left">
+                <button class="icon-btn" id="btn-back">←</button>
+                <div class="avatar-circle" id="chat-partner-avatar-container">?</div>
+                <div class="chat-header-info">
+                    <span class="chat-partner-name" id="chat-partner-name">@Teman</span>
+                    <span class="chat-status" id="chat-status-indicator">...</span>
                 </div>
             </div>
-
-            <!-- Tombol Telepon Suara & Video Call Native WebRTC -->
-            <div class="call-btn-group">
-                <button id="btn-start-audio-call" class="call-icon-btn" title="Panggilan Suara">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6.62 10.79a15.053 15.053 0 006.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
-                </button>
-                <button id="btn-start-video-call" class="call-icon-btn" title="Panggilan Video">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
-                </button>
+            <div class="chat-header-right">
+                <button class="icon-btn" id="btn-start-audio-call" title="Panggilan Suara">📞</button>
+                <button class="icon-btn" id="btn-start-video-call" title="Video Call">🎥</button>
             </div>
         </div>
 
-        <div id="chat-messages" class="chat-messages"></div>
+        <div class="chat-messages" id="chat-messages">
+            <!-- Pesan Chat -->
+        </div>
 
-        <div class="chat-input-container">
-            <div id="reply-preview-box" class="reply-preview-box">
-                <div class="reply-preview-content">
-                    <strong id="replying-to-user">Membalas...</strong>
-                    <span id="replying-to-text">Pesan...</span>
+        <div class="chat-input-area">
+            <div class="reply-preview-box" id="reply-preview-box">
+                <div>
+                    <span class="quoted-sender" id="replying-to-user">Membalas...</span>
+                    <span id="replying-to-text" style="color: #aaa; font-size: 11px;">Teks pesan...</span>
                 </div>
-                <button id="btn-cancel-reply" class="btn-cancel-reply">✕</button>
+                <button class="icon-btn" id="btn-cancel-reply" style="font-size: 14px;">✕</button>
             </div>
-            
-            <div class="chat-input-area" style="position: relative;">
-                <div class="chat-action-menu-container">
-                    <button id="btn-toggle-chat-plus" class="btn-plus-action" title="Fitur Tambahan">＋</button>
-                    <div id="chat-plus-popup" class="chat-plus-popup">
-                        <button id="btn-invite-game" class="popup-action-item">
-                            <span>🎮</span> Game Tic-Tac-Toe
-                        </button>
-                        <button id="btn-open-music" class="popup-action-item">
-                            <span>🎵</span> Mini Music
-                        </button>
-                    </div>
-                </div>
 
-                <textarea id="message-input" placeholder="Ketik pesan..." rows="1" autocomplete="off"></textarea>
-                <button id="btn-send" class="btn-send">Kirim</button>
+            <div class="chat-input-row">
+                <button class="btn-plus-menu" id="btn-toggle-chat-plus">＋</button>
+                <textarea id="message-input" rows="1" placeholder="Ketik pesan..."></textarea>
+                <button class="btn-send" id="btn-send">➤</button>
+            </div>
+
+            <!-- Menu Pop-up Tombol (+) -->
+            <div class="chat-plus-popup" id="chat-plus-popup">
+                <button class="popup-menu-item" id="btn-invite-game">🎮 Main Game Tic-Tac-Toe</button>
+                <button class="popup-menu-item" id="btn-open-music">🎵 Putar Musik Bersama</button>
             </div>
         </div>
     </div>
 
-    <!-- MODAL LAYAR TELEPON WEBRTC NATIVE -->
-    <div id="webrtc-call-modal">
-        <div style="text-align: center; color: #fff; margin-top: 20px;">
-            <h3 id="call-target-name" style="margin: 0; font-size: 18px;">Memanggil...</h3>
-            <p id="call-status-text" style="margin: 6px 0; font-size: 13px; color: #aaa;">Menghubungkan WebRTC...</p>
+    <!-- 6. WEBRTC CALL MODAL -->
+    <div id="webrtc-call-modal" class="webrtc-call-modal">
+        <div class="call-header-info">
+            <div class="call-target-name" id="call-target-name">@Teman</div>
+            <div class="call-status-text" id="call-status-text">Menghubungkan...</div>
         </div>
 
-        <div class="video-container">
+        <div class="call-video-container">
             <video id="remote-video" autoplay playsinline></video>
             <video id="local-video" autoplay playsinline muted></video>
         </div>
 
-        <div style="display: flex; gap: 20px; margin-bottom: 30px;">
-            <button id="btn-toggle-mic" style="background: #333; color: #fff; border: none; width: 50px; height: 50px; border-radius: 50%; font-size: 18px; cursor: pointer;">🎙️</button>
-            <button id="btn-end-webrtc-call" style="background: #dc3545; color: #fff; border: none; width: 60px; height: 60px; border-radius: 50%; font-size: 22px; cursor: pointer;">📞</button>
-            <button id="btn-toggle-cam" style="background: #333; color: #fff; border: none; width: 50px; height: 50px; border-radius: 50%; font-size: 18px; cursor: pointer;">📹</button>
+        <div class="call-actions">
+            <button class="call-btn btn-ctrl" id="btn-toggle-mic">🎤</button>
+            <button class="call-btn btn-end-call" id="btn-end-webrtc-call">📞</button>
+            <button class="call-btn btn-ctrl" id="btn-toggle-cam">📷</button>
         </div>
     </div>
 
-    <!-- MODAL OPSI PESAN -->
-    <div id="message-options-modal" class="modal-backdrop">
-        <div class="modal-content">
-            <button id="opt-reply">Balas (Reply)</button>
-            <button id="opt-delete-me">Hapus untuk Saya</button>
-            <button id="opt-delete-all" class="danger-text">Hapus untuk Semua Orang</button>
-            <button id="opt-cancel" class="cancel-btn">Batal</button>
+    <!-- 7. GAME MODAL -->
+    <div id="game-modal" class="game-modal">
+        <h2 style="color: #fff; margin-bottom: 8px;">Tic-Tac-Toe Sesi</h2>
+        <div id="game-status-text" style="color: #1db954; font-size: 14px; margin-bottom: 12px;">Menunggu giliran...</div>
+        <div class="game-board">
+            <div class="game-cell" data-index="0"></div>
+            <div class="game-cell" data-index="1"></div>
+            <div class="game-cell" data-index="2"></div>
+            <div class="game-cell" data-index="3"></div>
+            <div class="game-cell" data-index="4"></div>
+            <div class="game-cell" data-index="5"></div>
+            <div class="game-cell" data-index="6"></div>
+            <div class="game-cell" data-index="7"></div>
+            <div class="game-cell" data-index="8"></div>
         </div>
+        <button id="btn-close-game" class="btn-primary" style="max-width: 150px; background: #333; color: #fff;">Tutup Game</button>
     </div>
 
-    <!-- MODAL / PAPAN MINI GAME TIC-TAC-TOE -->
-    <div id="game-modal" class="modal-backdrop">
-        <div class="modal-content" style="align-items: center; padding: 24px; border-radius: 20px;">
-            <h3 style="margin-bottom: 4px; font-size: 18px; color: #111;">Tic-Tac-Toe Duel</h3>
-            <p id="game-status-text" style="font-size: 13px; color: #666; margin-bottom: 16px;">Menunggu giliran...</p>
-            
-            <div style="display: grid; grid-template-columns: repeat(3, 80px); grid-template-rows: repeat(3, 80px); gap: 8px; background: #e2e8f0; padding: 8px; border-radius: 12px;">
-                <button class="game-cell" data-index="0" style="background: #fff; border: none; font-size: 32px; font-weight: bold; cursor: pointer; border-radius: 8px; color: #111;"></button>
-                <button class="game-cell" data-index="1" style="background: #fff; border: none; font-size: 32px; font-weight: bold; cursor: pointer; border-radius: 8px; color: #111;"></button>
-                <button class="game-cell" data-index="2" style="background: #fff; border: none; font-size: 32px; font-weight: bold; cursor: pointer; border-radius: 8px; color: #111;"></button>
-                <button class="game-cell" data-index="3" style="background: #fff; border: none; font-size: 32px; font-weight: bold; cursor: pointer; border-radius: 8px; color: #111;"></button>
-                <button class="game-cell" data-index="4" style="background: #fff; border: none; font-size: 32px; font-weight: bold; cursor: pointer; border-radius: 8px; color: #111;"></button>
-                <button class="game-cell" data-index="5" style="background: #fff; border: none; font-size: 32px; font-weight: bold; cursor: pointer; border-radius: 8px; color: #111;"></button>
-                <button class="game-cell" data-index="6" style="background: #fff; border: none; font-size: 32px; font-weight: bold; cursor: pointer; border-radius: 8px; color: #111;"></button>
-                <button class="game-cell" data-index="7" style="background: #fff; border: none; font-size: 32px; font-weight: bold; cursor: pointer; border-radius: 8px; color: #111;"></button>
-                <button class="game-cell" data-index="8" style="background: #fff; border: none; font-size: 32px; font-weight: bold; cursor: pointer; border-radius: 8px; color: #111;"></button>
-            </div>
-
-            <button id="btn-close-game" class="btn primary" style="margin-top: 16px; width: 100%; max-width: 256px;">Tutup Game</button>
+    <!-- 8. MUSIC PLAYER MODAL -->
+    <div id="music-modal" class="music-modal">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #282828; padding-bottom: 12px;">
+            <span id="music-modal-title" style="font-size: 15px; font-weight: bold; color: #fff;">Mini Music</span>
+            <button class="icon-btn" id="btn-close-music">✕</button>
         </div>
-    </div>
 
-    <!-- MODAL PEMUTAR MUSIK (MINI MUSIC WITH SLIDER) -->
-    <div id="music-modal" class="modal-backdrop" style="z-index: 1000;">
-        <div class="modal-content" style="background: #121212; color: #fff; padding: 20px 16px; border-radius: 20px; width: 90%; max-width: 340px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); border: 1px solid #333; position: relative; z-index: 1001; overflow: hidden;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 0 8px;">
-                <h3 id="music-modal-title" style="font-size: 15px; font-weight: bold; margin: 0; color: #fff;">Mini Music</h3>
-                <div style="display: flex; gap: 8px; align-items: center;">
-                    <button id="btn-open-admin-music" title="Kelola Musik" style="background: #282828; border: 1px solid #444; color: #fff; width: 30px; height: 30px; border-radius: 50%; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; position: relative; z-index: 1005;">⚙️</button>
-                    <button id="btn-close-music" style="background: none; border: none; color: #aaa; font-size: 18px; cursor: pointer;">✕</button>
+        <div id="music-slider-wrapper" style="flex: 1; overflow: hidden; position: relative; margin: 16px 0;">
+            <div id="music-slider" style="display: flex; width: 200%; height: 100%; transition: transform 0.3s ease;">
+                <!-- Halaman 1: Playlist -->
+                <div style="width: 50%; display: flex; flex-direction: column; padding-right: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <span style="font-size: 12px; color: #888;">Daftar Lagu</span>
+                        <button id="btn-open-admin-music" style="background: none; border: none; color: #1db954; font-size: 11px; cursor: pointer;">+ Kelola Lagu (Admin)</button>
+                    </div>
+                    <div id="playlist-container" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;"></div>
                 </div>
-            </div>
-
-            <div class="music-dots-indicator">
-                <span id="dot-playlist" class="music-dot" title="Daftar Musik"></span>
-                <span id="dot-player" class="music-dot active" title="Pemutar Musik"></span>
-            </div>
-
-            <div id="music-slider-wrapper" style="width: 100%; overflow: hidden;">
-                <div id="music-slider" class="music-slider-container" style="transform: translateX(-50%);">
-                    <div class="music-slide" style="padding: 0 8px;">
-                        <div style="max-height: 310px; overflow-y: auto;">
-                            <p style="font-size: 12px; color: #b3b3b3; margin: 0 0 10px 0; font-weight: bold;">Daftar Musik</p>
-                            <div id="playlist-container" style="display: flex; flex-direction: column; gap: 8px;"></div>
-                        </div>
+                <!-- Halaman 2: Pemutar Musik -->
+                <div style="width: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-left: 8px;">
+                    <div id="pixel-svg-container" style="margin-bottom: 20px;"></div>
+                    <div id="song-title" style="font-size: 16px; font-weight: bold; color: #fff; text-align: center; margin-bottom: 4px;">Pilih Lagu</div>
+                    <div id="song-artist" style="font-size: 12px; color: #888; text-align: center; margin-bottom: 20px;">-</div>
+                    
+                    <div style="width: 100%; display: flex; align-items: center; gap: 8px; margin-bottom: 20px;">
+                        <span id="current-time" style="font-size: 10px; color: #888;">0:00</span>
+                        <input type="range" id="song-progress" value="0" min="0" max="100" style="flex: 1; accent-color: #1db954;">
+                        <span id="total-duration" style="font-size: 10px; color: #888;">0:00</span>
                     </div>
 
-                    <div class="music-slide" style="padding: 0 8px;">
-                        <div style="background: #181818; padding: 16px; border-radius: 16px; border: 1px solid #282828; display: flex; flex-direction: column; align-items: center;">
-                            <div id="album-cover-display" style="width: 140px; height: 140px; background: #111111; border-radius: 12px; margin-bottom: 12px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 20px rgba(0,0,0,0.5); position: relative; overflow: hidden; border: 2px solid #333;">
-                                <div id="pixel-svg-container" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;"></div>
-                                <div id="music-waves" style="position: absolute; bottom: 8px; display: flex; gap: 3px; opacity: 0; transition: opacity 0.3s; background: rgba(0,0,0,0.6); padding: 4px 8px; border-radius: 10px;">
-                                    <span style="width: 3px; height: 12px; background: #fff; animation: bounce 0.6s infinite alternate;"></span>
-                                    <span style="width: 3px; height: 20px; background: #fff; animation: bounce 0.4s infinite alternate;"></span>
-                                    <span style="width: 3px; height: 15px; background: #fff; animation: bounce 0.5s infinite alternate;"></span>
-                                </div>
-                            </div>
-
-                            <div style="text-align: center; margin-bottom: 12px; width: 100%;">
-                                <h4 id="song-title" style="font-size: 14px; font-weight: bold; margin: 0 0 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Memuat lagu...</h4>
-                                <p id="song-artist" style="font-size: 11px; color: #b3b3b3; margin: 0;">Silakan tunggu</p>
-                            </div>
-
-                            <div style="margin-bottom: 14px; width: 100%;">
-                                <input type="range" id="song-progress" value="0" max="100" style="width: 100%; accent-color: #fff; cursor: pointer; height: 4px; background: #404040; border-radius: 2px;">
-                                <div style="display: flex; justify-content: space-between; font-size: 10px; color: #b3b3b3; margin-top: 4px;">
-                                    <span id="current-time">0:00</span>
-                                    <span id="total-duration">0:00</span>
-                                </div>
-                            </div>
-
-                            <div style="display: flex; justify-content: center; align-items: center; gap: 24px;">
-                                <button id="btn-prev-song" class="svg-btn" title="Sebelumnya">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2"></line></svg>
-                                </button>
-                                <button id="btn-play-pause" class="svg-btn-main" title="Play/Pause">
-                                    <svg id="svg-icon-play" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                                    <svg id="svg-icon-pause" width="22" height="22" viewBox="0 0 24 24" fill="currentColor" style="display: none;"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
-                                </button>
-                                <button id="btn-next-song" class="svg-btn" title="Selanjutnya">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2"></line></svg>
-                                </button>
-                            </div>
-                        </div>
+                    <div style="display: flex; align-items: center; gap: 24px;">
+                        <button class="icon-btn" id="btn-prev-song" style="font-size: 20px;">⏮</button>
+                        <button id="btn-play-pause" style="width: 50px; height: 50px; background: #fff; border: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                            <svg id="svg-icon-play" width="16" height="16" viewBox="0 0 24 24" fill="#121212"><polygon points="5,3 19,12 5,21"></polygon></svg>
+                            <svg id="svg-icon-pause" width="16" height="16" viewBox="0 0 24 24" fill="#121212" style="display:none;"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                        </button>
+                        <button class="icon-btn" id="btn-next-song" style="font-size: 20px;">⏭</button>
                     </div>
                 </div>
             </div>
         </div>
+
+        <div style="display: flex; justify-content: center; gap: 6px; padding-top: 10px;">
+            <span id="dot-playlist" style="width: 6px; height: 6px; border-radius: 50%; background: #555; cursor: pointer;"></span>
+            <span id="dot-player" style="width: 6px; height: 6px; border-radius: 50%; background: #1db954; cursor: pointer;" class="active"></span>
+        </div>
     </div>
 
-    <!-- MODAL KELOLA MUSIK (ADMIN) -->
-    <div id="music-admin-modal" class="modal-backdrop" style="z-index: 2000;">
-        <div class="modal-content" style="background: #181818; color: #fff; padding: 20px; border-radius: 16px; width: 90%; max-width: 320px; border: 1px solid #333; position: relative; z-index: 2001;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-                <h4 style="margin: 0; font-size: 15px;">Kelola Musik (Database Admin)</h4>
-                <button id="btn-close-admin-music" style="background: none; border: none; color: #aaa; font-size: 16px; cursor: pointer;">✕</button>
-            </div>
-
+    <!-- 9. MUSIC ADMIN MODAL -->
+    <div id="music-admin-modal" class="music-modal">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #282828; padding-bottom: 12px;">
+            <span style="font-size: 15px; font-weight: bold; color: #fff;">Admin Musik Panel</span>
+            <button class="icon-btn" id="btn-close-admin-music">✕</button>
+        </div>
+        <div style="flex: 1; overflow-y: auto; padding-top: 16px;">
             <div id="admin-auth-section">
-                <p style="font-size: 12px; color: #ccc; margin-top: 0;">Masukkan password admin untuk mengunggah lagu ke server:</p>
-                <input type="password" id="admin-pass-input" placeholder="Password admin..." style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #444; background: #222; color: #fff; font-size: 13px; outline: none; margin-bottom: 10px;">
-                <button id="btn-verify-admin" class="btn primary" style="width: 100%; padding: 8px;">Masuk Admin</button>
-            </div>
-
-            <div id="admin-panel-section" style="display: none;">
-                <div style="background: #222; padding: 12px; border-radius: 8px; margin-bottom: 12px;">
-                    <p style="font-size: 12px; font-weight: bold; margin: 0 0 8px 0; color: #fff;">Upload Lagu ke Database</p>
-                    <input type="text" id="add-song-title" placeholder="Judul lagu..." style="width: 100%; padding: 6px 8px; border-radius: 4px; border: 1px solid #444; background: #111; color: #fff; font-size: 11px; margin-bottom: 6px; outline: none;">
-                    <input type="text" id="add-song-artist" placeholder="Nama penyanyi / artist..." style="width: 100%; padding: 6px 8px; border-radius: 4px; border: 1px solid #444; background: #111; color: #fff; font-size: 11px; margin-bottom: 8px; outline: none;">
-                    
-                    <label style="font-size: 10px; color: #aaa; display: block; margin-bottom: 2px;">File Audio (.mp3)</label>
-                    <input type="file" id="admin-audio-input" accept="audio/*,.mp3" style="font-size: 11px; margin-bottom: 10px; color: #ccc; width: 100%;">
-                    
-                    <label style="font-size: 10px; color: #aaa; display: block; margin-bottom: 4px;">Pilih Desain Pixel Cover:</label>
-                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 12px;">
-                        <div class="pixel-cover-option selected" data-style="vinyl">
-                            <svg width="28" height="28" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#111"/><circle cx="12" cy="12" r="3" fill="#1db954"/></svg>
-                        </div>
-                        <div class="pixel-cover-option" data-style="tape">
-                            <svg width="28" height="28" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2" fill="#333"/><circle cx="8" cy="12" r="2" fill="#fff"/><circle cx="16" cy="12" r="2" fill="#fff"/></svg>
-                        </div>
-                        <div class="pixel-cover-option" data-style="gameboy">
-                            <svg width="28" height="28" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2" fill="#5b21b6"/><rect x="6" y="5" width="12" height="8" fill="#a7f3d0"/></svg>
-                        </div>
-                        <div class="pixel-cover-option" data-style="headphone">
-                            <svg width="28" height="28" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 18 0v7h-4v-7h4A7 7 0 0 0 3 12z" fill="#0284c7"/><rect x="2" y="12" width="4" height="7" rx="1" fill="#fff"/></svg>
-                        </div>
-                    </div>
-
-                    <button id="btn-save-new-song" class="btn primary" style="width: 100%; padding: 6px; font-size: 12px;">Unggah ke Database</button>
+                <div class="input-group">
+                    <label>Password Admin</label>
+                    <input type="password" id="admin-pass-input" placeholder="Masukkan password admin">
                 </div>
-
-                <p style="font-size: 11px; font-weight: bold; margin: 0 0 6px 0; color: #fff;">Daftar Lagu di Database</p>
-                <div id="admin-delete-list" style="max-height: 100px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;"></div>
+                <button id="btn-verify-admin" class="btn-primary">Masuk Admin</button>
+            </div>
+            <div id="admin-panel-section" style="display: none; display: flex; flex-direction: column; gap: 12px;">
+                <div class="input-group">
+                    <label>Judul Lagu</label>
+                    <input type="text" id="add-song-title" placeholder="Nama lagu">
+                </div>
+                <div class="input-group">
+                    <label>Artis</label>
+                    <input type="text" id="add-song-artist" placeholder="Nama artis">
+                </div>
+                <div class="input-group">
+                    <label>File Audio (.mp3)</label>
+                    <input type="file" id="admin-audio-input" accept="audio/*">
+                </div>
+                <div class="input-group">
+                    <label>Pilih Tema Kaset (Pixel Cover)</label>
+                    <div style="display: flex; gap: 8px; margin-top: 4px;">
+                        <button type="button" class="pixel-cover-option selected" data-style="vinyl" style="padding: 6px 10px; background: #222; border: 1px solid #1db954; color: #fff; border-radius: 4px; cursor: pointer; font-size: 11px;">Vinyl</button>
+                        <button type="button" class="pixel-cover-option" data-style="tape" style="padding: 6px 10px; background: #222; border: 1px solid #333; color: #fff; border-radius: 4px; cursor: pointer; font-size: 11px;">Tape</button>
+                        <button type="button" class="pixel-cover-option" data-style="gameboy" style="padding: 6px 10px; background: #222; border: 1px solid #333; color: #fff; border-radius: 4px; cursor: pointer; font-size: 11px;">GameBoy</button>
+                        <button type="button" class="pixel-cover-option" data-style="headphone" style="padding: 6px 10px; background: #222; border: 1px solid #333; color: #fff; border-radius: 4px; cursor: pointer; font-size: 11px;">Headphone</button>
+                    </div>
+                </div>
+                <button id="btn-save-new-song" class="btn-primary">Unggah ke Database</button>
+                <div style="margin-top: 16px; border-top: 1px solid #282828; padding-top: 12px;">
+                    <span style="font-size: 12px; color: #aaa; display: block; margin-bottom: 8px;">Daftar Lagu (Hapus)</span>
+                    <div id="admin-delete-list" style="display: flex; flex-direction: column; gap: 6px;"></div>
+                </div>
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script>
-        const addFriendModal = document.getElementById('add-friend-modal');
-        const btnOpenAddFriendModal = document.getElementById('btn-open-add-friend-modal');
-        const btnCloseAddFriendModal = document.getElementById('btn-close-add-friend-modal');
+    <!-- 10. MODAL OPSI PESAN -->
+    <div id="message-options-modal" class="modal-overlay">
+        <div class="modal-sheet">
+            <button class="modal-btn" id="opt-reply">Balas Pesan</button>
+            <button class="modal-btn" id="opt-delete-me">Hapus untuk Saya</button>
+            <button class="modal-btn danger" id="opt-delete-all">Hapus untuk Semua Orang</button>
+            <button class="modal-btn" id="opt-cancel" style="background: #181818; margin-top: 4px;">Batal</button>
+        </div>
+    </div>
 
-        if (btnOpenAddFriendModal) {
-            btnOpenAddFriendModal.addEventListener('click', () => {
-                addFriendModal.classList.add('active');
-            });
-        }
-
-        if (btnCloseAddFriendModal) {
-            btnCloseAddFriendModal.addEventListener('click', () => {
-                addFriendModal.classList.remove('active');
-            });
-        }
-
-        window.addEventListener('click', (e) => {
-            if (e.target === addFriendModal) {
-                addFriendModal.classList.remove('active');
-            }
-        });
-
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js')
-                    .then(reg => console.log('Service Worker terdaftar:', reg.scope))
-                    .catch(err => console.error('Pendaftaran Service Worker gagal:', err));
-            });
-        }
-    </script>
+    <!-- Hubungkan ke file script.js -->
     <script src="script.js"></script>
 </body>
 </html>
