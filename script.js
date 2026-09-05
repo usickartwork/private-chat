@@ -96,12 +96,29 @@ let peerConnection = null;
 let signalingChannel = null;
 let isAudioOnlyCall = false;
 
-// Konfigurasi STUN/TURN Server Google & Metered.ca
+// Konfigurasi STUN/TURN Server Google & OpenRelay Gratis (Tanpa API Key/Metered Limit)
 const iceServersConfig = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' }
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' },
+        {
+            urls: 'turn:openrelay.metered.ca:80',
+            username: 'openrelay',
+            credential: 'openrelay'
+        },
+        {
+            urls: 'turn:openrelay.metered.ca:443',
+            username: 'openrelay',
+            credential: 'openrelay'
+        },
+        {
+            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+            username: 'openrelay',
+            credential: 'openrelay'
+        }
     ]
 };
 
@@ -853,24 +870,35 @@ function setupWebRTCSignaling() {
     signalingChannel
         .on('broadcast', { event: 'signal' }, async payload => {
             const data = payload.payload;
-            if (data.sender === currentUserId) return;
+            if (!data || data.sender === currentUserId) return;
 
-            if (data.type === 'offer') {
-                callStatusText.textContent = 'Panggilan Masuk...';
-                showWebRTCUI(data.isVideo);
-                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
-            } else if (data.type === 'answer') {
-                callStatusText.textContent = 'Terhubung!';
-                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-            } else if (data.type === 'ice-candidate') {
-                if (peerConnection && data.candidate) {
-                    await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+            try {
+                if (data.type === 'offer') {
+                    callStatusText.textContent = 'Panggilan Masuk...';
+                    showWebRTCUI(data.isVideo);
+                    if (!peerConnection) await createPeerConnection(data.isVideo);
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+                } else if (data.type === 'answer') {
+                    callStatusText.textContent = 'Terhubung!';
+                    if (peerConnection) {
+                        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+                    }
+                } else if (data.type === 'ice-candidate') {
+                    if (peerConnection && data.candidate) {
+                        await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                    }
+                } else if (data.type === 'end-call') {
+                    endWebRTCCall(false);
                 }
-            } else if (data.type === 'end-call') {
-                endWebRTCCall(false);
+            } catch (err) {
+                console.error("Gagal memproses sinyal WebRTC:", err);
             }
         })
-        .subscribe();
+        .subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+                console.log('Saluran sinyal WebRTC terhubung!');
+            }
+        });
 }
 
 function sendSignal(type, payloadData = {}) {
@@ -893,7 +921,7 @@ async function createPeerConnection(isVideo) {
     };
 
     peerConnection.ontrack = (event) => {
-        if (remoteVideo.srcObject !== event.streams[0]) {
+        if (event.streams && event.streams[0]) {
             remoteVideo.srcObject = event.streams[0];
             callStatusText.textContent = 'Terhubung!';
         }
@@ -902,8 +930,9 @@ async function createPeerConnection(isVideo) {
     try {
         localStream = await navigator.mediaDevices.getUserMedia({
             audio: true,
-            video: isVideo
+            video: isVideo ? { facingMode: 'user' } : false
         });
+        
         localVideo.srcObject = localStream;
         localVideo.style.display = isVideo ? 'block' : 'none';
 
@@ -911,8 +940,9 @@ async function createPeerConnection(isVideo) {
             peerConnection.addTrack(track, localStream);
         });
     } catch (err) {
-        alert('Gagal mengakses Mikrofon/Kamera. Pastikan aplikasi berjalan di HTTPS.');
-        endWebRTCCall();
+        console.error("Akses media gagal:", err);
+        alert('Gagal mengakses Mikrofon/Kamera. Pastikan situs menggunakan HTTPS dan izin telah diaktifkan.');
+        endWebRTCCall(true);
     }
 }
 
@@ -929,13 +959,13 @@ async function startWebRTCCall(isVideo = false) {
     showWebRTCUI(isVideo);
 
     await createPeerConnection(isVideo);
+    if (!peerConnection) return;
 
     const offer = await peerConnection.createOffer();
     await peerConnection.setLocalDescription(offer);
 
     sendSignal('offer', { offer, isVideo });
 
-    // Kirim pesan tercatat di database chat
     await supabaseClient.from('messages').insert([{
         sender_id: currentUserId,
         receiver_id: activeFriendId,
@@ -947,6 +977,7 @@ async function startWebRTCCall(isVideo = false) {
 async function answerWebRTCCall(isVideo = false) {
     showWebRTCUI(isVideo);
     await createPeerConnection(isVideo);
+    if (!peerConnection) return;
 
     const answer = await peerConnection.createAnswer();
     await peerConnection.setLocalDescription(answer);
