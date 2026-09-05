@@ -1027,14 +1027,14 @@ function handleIncomingGameMessage(msg) {
     }
 }
 
-// --- LOGIKA PEMUTAR MUSIK (SUPABASE REALTIME PLAYLIST + PIXEL ART COVERS) ---
+// --- LOGIKA PEMUTAR MUSIK (SLIDER HALAMAN & LIST DENGAN SUPABASE) ---
 const ADMIN_PASSWORD = "admin123";
 
 const PIXEL_COVERS = {
-    vinyl: `<svg width="120" height="120" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#0d0d0d"/><circle cx="12" cy="12" r="8" fill="#1f1f1f"/><circle cx="12" cy="12" r="4" fill="#1db954"/><circle cx="12" cy="12" r="1.5" fill="#fff"/></svg>`,
-    tape: `<svg width="120" height="120" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2" fill="#2d3748"/><rect x="4" y="7" width="16" height="6" rx="1" fill="#e2e8f0"/><circle cx="8" cy="10" r="2" fill="#1a202c"/><circle cx="16" cy="10" r="2" fill="#1a202c"/></svg>`,
-    gameboy: `<svg width="120" height="120" viewBox="0 0 24 24"><rect x="3" y="2" width="18" height="20" rx="3" fill="#6d28d9"/><rect x="5" y="4" width="14" height="9" fill="#6ee7b7"/><circle cx="16" cy="16" r="1.5" fill="#ef4444"/><circle cx="13" cy="18" r="1.5" fill="#ef4444"/></svg>`,
-    headphone: `<svg width="120" height="120" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 18 0v7h-5v-7h5A7 7 0 0 0 3 12z" fill="#0369a1"/><rect x="1" y="12" width="5" height="8" rx="2" fill="#f8fafc"/><rect x="18" y="12" width="5" height="8" rx="2" fill="#f8fafc"/></svg>`
+    vinyl: `<svg width="110" height="110" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#0d0d0d"/><circle cx="12" cy="12" r="8" fill="#1f1f1f"/><circle cx="12" cy="12" r="4" fill="#1db954"/><circle cx="12" cy="12" r="1.5" fill="#fff"/></svg>`,
+    tape: `<svg width="110" height="110" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2" fill="#2d3748"/><rect x="4" y="7" width="16" height="6" rx="1" fill="#e2e8f0"/><circle cx="8" cy="10" r="2" fill="#1a202c"/><circle cx="16" cy="10" r="2" fill="#1a202c"/></svg>`,
+    gameboy: `<svg width="110" height="110" viewBox="0 0 24 24"><rect x="3" y="2" width="18" height="20" rx="3" fill="#6d28d9"/><rect x="5" y="4" width="14" height="9" fill="#6ee7b7"/><circle cx="16" cy="16" r="1.5" fill="#ef4444"/><circle cx="13" cy="18" r="1.5" fill="#ef4444"/></svg>`,
+    headphone: `<svg width="110" height="110" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 18 0v7h-5v-7h5A7 7 0 0 0 3 12z" fill="#0369a1"/><rect x="1" y="12" width="5" height="8" rx="2" fill="#f8fafc"/><rect x="18" y="12" width="5" height="8" rx="2" fill="#f8fafc"/></svg>`
 };
 
 const btnOpenMusic = document.getElementById('btn-open-music');
@@ -1053,6 +1053,13 @@ const totalDurationEl = document.getElementById('total-duration');
 const playlistContainer = document.getElementById('playlist-container');
 const musicWaves = document.getElementById('music-waves');
 const pixelSvgContainer = document.getElementById('pixel-svg-container');
+
+// Elemen Slider & Dots
+const musicSlider = document.getElementById('music-slider');
+const musicSliderWrapper = document.getElementById('music-slider-wrapper');
+const dotPlaylist = document.getElementById('dot-playlist');
+const dotPlayer = document.getElementById('dot-player');
+const musicModalTitle = document.getElementById('music-modal-title');
 
 // Modal Admin
 const btnOpenAdminMusic = document.getElementById('btn-open-admin-music');
@@ -1077,6 +1084,53 @@ let currentSongIndex = -1;
 let audioElement = new Audio();
 let isPlayingMusic = false;
 let isAdminAuthenticated = false;
+
+// Navigasi Slider Musik (0: Playlist, 1: Pemutar Musik)
+let currentSlideIndex = 1;
+
+function goToSlide(index) {
+    currentSlideIndex = index;
+    if (index === 0) {
+        musicSlider.style.transform = 'translateX(0%)';
+        dotPlaylist.classList.add('active');
+        dotPlayer.classList.remove('active');
+        musicModalTitle.textContent = "Daftar Musik";
+    } else {
+        musicSlider.style.transform = 'translateX(-50%)';
+        dotPlayer.classList.add('active');
+        dotPlaylist.classList.remove('active');
+        musicModalTitle.textContent = "Mini Music";
+    }
+}
+
+if (dotPlaylist) dotPlaylist.addEventListener('click', () => goToSlide(0));
+if (dotPlayer) dotPlayer.addEventListener('click', () => goToSlide(1));
+
+// Deteksi Geser/Swipe Touch untuk berpindah halaman
+let touchStartX = 0;
+let touchEndX = 0;
+
+if (musicSliderWrapper) {
+    musicSliderWrapper.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+    }, false);
+
+    musicSliderWrapper.addEventListener('touchend', (e) => {
+        touchEndX = e.changedTouches[0].screenX;
+        handleSwipe();
+    }, false);
+}
+
+function handleSwipe() {
+    const swipeThreshold = 50;
+    if (touchEndX - touchStartX > swipeThreshold) {
+        // Swipe ke Kanan -> Buka Halaman Daftar Musik (Halaman 0)
+        goToSlide(0);
+    } else if (touchStartX - touchEndX > swipeThreshold) {
+        // Swipe ke Kiri -> Buka Halaman Pemutar Musik (Halaman 1)
+        goToSlide(1);
+    }
+}
 
 // Pilih Desain Pixel Cover
 pixelCoverOptions.forEach(opt => {
@@ -1116,6 +1170,7 @@ supabaseClient
 if (btnOpenMusic) {
     btnOpenMusic.addEventListener('click', () => {
         musicModal.classList.add('active');
+        goToSlide(1); // Selalu buka halaman Pemutar Musik saat diklik
         fetchPublicPlaylist();
     });
 }
@@ -1272,22 +1327,23 @@ function renderPlaylistUI() {
         songTitleEl.textContent = "Belum Ada Lagu";
         songArtistEl.textContent = "Database masih kosong";
         pixelSvgContainer.innerHTML = PIXEL_COVERS['vinyl'];
-        playlistContainer.innerHTML = '<p style="font-size: 11px; color: #666; text-align: center; margin: 8px 0;">Belum ada lagu dalam daftar putar.</p>';
+        playlistContainer.innerHTML = '<p style="font-size: 11px; color: #666; text-align: center; margin: 8px 0;">Belum ada lagu dalam daftar musik.</p>';
         return;
     }
 
     playlist.forEach((song, idx) => {
         const item = document.createElement('div');
-        item.style.cssText = `display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; border-radius: 6px; cursor: pointer; background: ${idx === currentSongIndex ? '#282828' : 'transparent'};`;
+        item.style.cssText = `display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-radius: 8px; cursor: pointer; background: ${idx === currentSongIndex ? '#282828' : '#181818'}; border: 1px solid ${idx === currentSongIndex ? '#444' : 'transparent'}; transition: background 0.2s;`;
         item.innerHTML = `
             <div>
-                <div style="font-size: 12px; font-weight: 500; color: ${idx === currentSongIndex ? '#ffffff' : '#ccc'};">${song.title}</div>
-                <div style="font-size: 10px; color: #888;">${song.artist}</div>
+                <div style="font-size: 13px; font-weight: 600; color: ${idx === currentSongIndex ? '#ffffff' : '#ccc'};">${song.title}</div>
+                <div style="font-size: 11px; color: #888; margin-top: 2px;">${song.artist}</div>
             </div>
-            <span style="font-size: 10px; color: #aaa;">${idx === currentSongIndex && isPlayingMusic ? 'Playing' : '▶'}</span>
+            <span style="font-size: 11px; color: ${idx === currentSongIndex ? '#1db954' : '#aaa'}; font-weight: bold;">${idx === currentSongIndex && isPlayingMusic ? 'Playing' : '▶'}</span>
         `;
         item.addEventListener('click', () => {
             loadSong(idx, true);
+            goToSlide(1); // Otomatis berpindah ke Pemutar Musik setelah memilih lagu
         });
         playlistContainer.appendChild(item);
     });
