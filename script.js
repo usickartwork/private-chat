@@ -75,6 +75,10 @@ const optDeleteMe = document.getElementById('opt-delete-me');
 const optDeleteAll = document.getElementById('opt-delete-all');
 const optCancel = document.getElementById('opt-cancel');
 
+// Elemen Plus (+) Menu Pop-up di Obrolan
+const btnToggleChatPlus = document.getElementById('btn-toggle-chat-plus');
+const chatPlusPopup = document.getElementById('chat-plus-popup');
+
 // Elemen Game Tic-Tac-Toe
 const btnInviteGame = document.getElementById('btn-invite-game');
 const gameModal = document.getElementById('game-modal');
@@ -782,6 +786,24 @@ if (btnSend) {
     btnSend.addEventListener('click', sendMessage);
 }
 
+// --- LOGIKA TOGGLE MENU TAMBAHAN (+) DI OBROLAN ---
+if (btnToggleChatPlus) {
+    btnToggleChatPlus.addEventListener('click', (e) => {
+        e.stopPropagation();
+        btnToggleChatPlus.classList.toggle('active');
+        chatPlusPopup.classList.toggle('active');
+    });
+}
+
+document.addEventListener('click', (e) => {
+    if (chatPlusPopup && chatPlusPopup.classList.contains('active')) {
+        if (!chatPlusPopup.contains(e.target) && e.target !== btnToggleChatPlus) {
+            btnToggleChatPlus.classList.remove('active');
+            chatPlusPopup.classList.remove('active');
+        }
+    }
+});
+
 // --- FITUR TYPING INDICATOR & TEXTAREA AUTO-RESIZE ---
 function setupTypingIndicator() {
     if (typingChannel) supabaseClient.removeChannel(typingChannel);
@@ -849,6 +871,9 @@ function setupTypingIndicator() {
 // --- LOGIKA MINI GAME TIC-TAC-TOE ---
 if (btnInviteGame) {
     btnInviteGame.addEventListener('click', async () => {
+        if (btnToggleChatPlus) btnToggleChatPlus.classList.remove('active');
+        if (chatPlusPopup) chatPlusPopup.classList.remove('active');
+
         await supabaseClient.from('messages').insert([{
             sender_id: currentUserId,
             receiver_id: activeFriendId,
@@ -1027,7 +1052,7 @@ function handleIncomingGameMessage(msg) {
     }
 }
 
-// --- LOGIKA PEMUTAR MUSIK (SLIDER HALAMAN & LIST DENGAN SUPABASE) ---
+// --- LOGIKA PEMUTAR MUSIK (SLIDER HALAMAN & DELETE FISIK SUPABASE STORAGE) ---
 const ADMIN_PASSWORD = "admin123";
 
 const PIXEL_COVERS = {
@@ -1106,7 +1131,7 @@ function goToSlide(index) {
 if (dotPlaylist) dotPlaylist.addEventListener('click', () => goToSlide(0));
 if (dotPlayer) dotPlayer.addEventListener('click', () => goToSlide(1));
 
-// Deteksi Geser/Swipe Touch untuk berpindah halaman
+// Deteksi Geser/Swipe Touch
 let touchStartX = 0;
 let touchEndX = 0;
 
@@ -1124,10 +1149,8 @@ if (musicSliderWrapper) {
 function handleSwipe() {
     const swipeThreshold = 50;
     if (touchEndX - touchStartX > swipeThreshold) {
-        // Swipe ke Kanan -> Buka Halaman Daftar Musik (Halaman 0)
         goToSlide(0);
     } else if (touchStartX - touchEndX > swipeThreshold) {
-        // Swipe ke Kiri -> Buka Halaman Pemutar Musik (Halaman 1)
         goToSlide(1);
     }
 }
@@ -1159,7 +1182,7 @@ async function fetchPublicPlaylist() {
 
 fetchPublicPlaylist();
 
-// Realtime Sync Musik untuk Semua Pengguna
+// Realtime Sync Musik
 supabaseClient
     .channel('public:songs')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'songs' }, () => {
@@ -1169,8 +1192,11 @@ supabaseClient
 
 if (btnOpenMusic) {
     btnOpenMusic.addEventListener('click', () => {
+        if (btnToggleChatPlus) btnToggleChatPlus.classList.remove('active');
+        if (chatPlusPopup) chatPlusPopup.classList.remove('active');
+
         musicModal.classList.add('active');
-        goToSlide(1); // Selalu buka halaman Pemutar Musik saat diklik
+        goToSlide(1);
         fetchPublicPlaylist();
     });
 }
@@ -1292,17 +1318,42 @@ function renderAdminDeleteList() {
             <button style="background: #dc3545; color: #fff; border: none; padding: 2px 6px; border-radius: 4px; font-size: 10px; cursor: pointer;">Hapus</button>
         `;
         item.querySelector('button').addEventListener('click', () => {
-            deleteSongFromDB(song.id);
+            deleteSongFromDB(song);
         });
         adminDeleteList.appendChild(item);
     });
 }
 
-async function deleteSongFromDB(songId) {
-    if (confirm("Yakin ingin menghapus lagu ini dari database publik?")) {
-        await supabaseClient.from('songs').delete().eq('id', songId);
-        await fetchPublicPlaylist();
-        renderAdminDeleteList();
+// PERBAIKAN: Hapus file fisik dari Storage + hapus dari Database
+async function deleteSongFromDB(song) {
+    if (confirm(`Yakin ingin menghapus lagu "${song.title}" dari database dan storage?`)) {
+        try {
+            // Extrak nama file dari URL publik Supabase Storage
+            const urlParts = song.src.split('/');
+            const fileName = urlParts[urlParts.length - 1];
+
+            // 1. Hapus file audio dari Storage
+            if (fileName) {
+                await supabaseClient.storage.from('music').remove([fileName]);
+            }
+
+            // 2. Hapus metadata lagu dari tabel Database
+            const { error } = await supabaseClient.from('songs').delete().eq('id', song.id);
+            if (error) throw error;
+
+            if (currentSongIndex >= 0 && playlist[currentSongIndex]?.id === song.id) {
+                pauseMusic();
+                audioElement.src = '';
+                currentSongIndex = -1;
+            }
+
+            await fetchPublicPlaylist();
+            renderAdminDeleteList();
+            alert('Lagu berhasil dihapus permanen!');
+        } catch (err) {
+            console.error("Gagal menghapus lagu:", err);
+            alert("Gagal menghapus lagu.");
+        }
     }
 }
 
@@ -1343,7 +1394,7 @@ function renderPlaylistUI() {
         `;
         item.addEventListener('click', () => {
             loadSong(idx, true);
-            goToSlide(1); // Otomatis berpindah ke Pemutar Musik setelah memilih lagu
+            goToSlide(1);
         });
         playlistContainer.appendChild(item);
     });
