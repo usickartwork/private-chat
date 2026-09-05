@@ -1043,21 +1043,11 @@ const musicWaves = document.getElementById('music-waves');
 const btnUploadMusic = document.getElementById('btn-upload-music');
 const uploadMusicFile = document.getElementById('upload-music-file');
 
-const playlist = [
-    {
-        title: "Lofi Study Beats",
-        artist: "Chillhop Music",
-        src: "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf756.mp3?filename=lofi-study-112191.mp3"
-    },
-    {
-        title: "Ambient Chill",
-        artist: "Relaxing Sounds",
-        src: "https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3?filename=chill-abstract-intention-12099.mp3"
-    }
-];
+// Playlist awal dibuat kosong (tanpa lagu dummy)
+const playlist = [];
 
-let currentSongIndex = 0;
-let audioElement = new Audio(playlist[0].src);
+let currentSongIndex = -1;
+let audioElement = new Audio();
 let isPlayingMusic = false;
 
 if (btnOpenMusic) {
@@ -1074,6 +1064,7 @@ if (btnCloseMusic) {
 }
 
 function loadSong(index) {
+    if (index < 0 || index >= playlist.length) return;
     currentSongIndex = index;
     audioElement.src = playlist[index].src;
     songTitleEl.textContent = playlist[index].title;
@@ -1084,6 +1075,13 @@ function loadSong(index) {
 
 function renderPlaylistUI() {
     playlistContainer.innerHTML = '';
+    if (playlist.length === 0) {
+        songTitleEl.textContent = "Belum Ada Lagu";
+        songArtistEl.textContent = "Silakan tambah lagu";
+        playlistContainer.innerHTML = '<p style="font-size: 11px; color: #666; text-align: center; margin: 8px 0;">Belum ada lagu dalam daftar putar.</p>';
+        return;
+    }
+
     playlist.forEach((song, idx) => {
         const item = document.createElement('div');
         item.style.cssText = `display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; border-radius: 6px; cursor: pointer; background: ${idx === currentSongIndex ? '#282828' : 'transparent'};`;
@@ -1092,7 +1090,7 @@ function renderPlaylistUI() {
                 <div style="font-size: 12px; font-weight: 500; color: ${idx === currentSongIndex ? '#1db954' : '#fff'};">${song.title}</div>
                 <div style="font-size: 10px; color: #888;">${song.artist}</div>
             </div>
-            <span style="font-size: 11px; color: #aaa;">${idx === currentSongIndex ? 'playing' : '▶'}</span>
+            <span style="font-size: 11px; color: #aaa;">${idx === currentSongIndex && isPlayingMusic ? '▶ playing' : '▶'}</span>
         `;
         item.addEventListener('click', () => {
             loadSong(idx);
@@ -1103,10 +1101,19 @@ function renderPlaylistUI() {
 }
 
 function playMusic() {
+    if (playlist.length === 0) {
+        alert("Tambahkan lagu dari perangkat terlebih dahulu!");
+        return;
+    }
+    if (currentSongIndex === -1 && playlist.length > 0) {
+        loadSong(0);
+    }
+    
     audioElement.play().then(() => {
         isPlayingMusic = true;
         btnPlayPause.textContent = '⏸';
         musicWaves.style.opacity = '1';
+        renderPlaylistUI();
     }).catch(err => {
         console.log("Autoplay diblokir", err);
     });
@@ -1117,6 +1124,7 @@ function pauseMusic() {
     isPlayingMusic = false;
     btnPlayPause.textContent = '▶';
     musicWaves.style.opacity = '0';
+    renderPlaylistUI();
 }
 
 if (btnPlayPause) {
@@ -1127,6 +1135,7 @@ if (btnPlayPause) {
 
 if (btnNextSong) {
     btnNextSong.addEventListener('click', () => {
+        if (playlist.length === 0) return;
         currentSongIndex = (currentSongIndex + 1) % playlist.length;
         loadSong(currentSongIndex);
         playMusic();
@@ -1135,6 +1144,7 @@ if (btnNextSong) {
 
 if (btnPrevSong) {
     btnPrevSong.addEventListener('click', () => {
+        if (playlist.length === 0) return;
         currentSongIndex = (currentSongIndex - 1 + playlist.length) % playlist.length;
         loadSong(currentSongIndex);
         playMusic();
@@ -1150,6 +1160,8 @@ if (uploadMusicFile) {
         const files = e.target.files;
         if (!files || files.length === 0) return;
 
+        const previousLength = playlist.length;
+
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
             const fileObjectURL = URL.createObjectURL(file);
@@ -1161,8 +1173,14 @@ if (uploadMusicFile) {
                 src: fileObjectURL
             });
         }
+
         renderPlaylistUI();
-        alert(`${files.length} lagu lokal berhasil ditambahkan!`);
+
+        if (previousLength === 0 && playlist.length > 0) {
+            loadSong(0);
+        }
+
+        alert(`${files.length} lagu berhasil ditambahkan ke pemutar musik!`);
     });
 }
 
@@ -1182,18 +1200,20 @@ songProgress.addEventListener('input', () => {
 });
 
 audioElement.addEventListener('ended', () => {
+    if (playlist.length === 0) return;
     currentSongIndex = (currentSongIndex + 1) % playlist.length;
     loadSong(currentSongIndex);
     playMusic();
 });
 
 function formatTime(seconds) {
+    if (isNaN(seconds)) return "0:00";
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
 }
 
-loadSong(0);
+renderPlaylistUI();
 
 function subscribeToRealtime() {
     if (chatSubscription) supabaseClient.removeChannel(chatSubscription);
