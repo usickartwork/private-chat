@@ -1027,8 +1027,15 @@ function handleIncomingGameMessage(msg) {
     }
 }
 
-// --- LOGIKA PEMUTAR MUSIK (MINI MUSIC WITH PERMANENT LOCALSTORAGE) ---
+// --- LOGIKA PEMUTAR MUSIK (SUPABASE REALTIME PLAYLIST + PIXEL ART COVERS) ---
 const ADMIN_PASSWORD = "admin123";
+
+const PIXEL_COVERS = {
+    vinyl: `<svg width="120" height="120" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#0d0d0d"/><circle cx="12" cy="12" r="8" fill="#1f1f1f"/><circle cx="12" cy="12" r="4" fill="#1db954"/><circle cx="12" cy="12" r="1.5" fill="#fff"/></svg>`,
+    tape: `<svg width="120" height="120" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2" fill="#2d3748"/><rect x="4" y="7" width="16" height="6" rx="1" fill="#e2e8f0"/><circle cx="8" cy="10" r="2" fill="#1a202c"/><circle cx="16" cy="10" r="2" fill="#1a202c"/></svg>`,
+    gameboy: `<svg width="120" height="120" viewBox="0 0 24 24"><rect x="3" y="2" width="18" height="20" rx="3" fill="#6d28d9"/><rect x="5" y="4" width="14" height="9" fill="#6ee7b7"/><circle cx="16" cy="16" r="1.5" fill="#ef4444"/><circle cx="13" cy="18" r="1.5" fill="#ef4444"/></svg>`,
+    headphone: `<svg width="120" height="120" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 18 0v7h-5v-7h5A7 7 0 0 0 3 12z" fill="#0369a1"/><rect x="1" y="12" width="5" height="8" rx="2" fill="#f8fafc"/><rect x="18" y="12" width="5" height="8" rx="2" fill="#f8fafc"/></svg>`
+};
 
 const btnOpenMusic = document.getElementById('btn-open-music');
 const musicModal = document.getElementById('music-modal');
@@ -1045,8 +1052,7 @@ const currentTimeEl = document.getElementById('current-time');
 const totalDurationEl = document.getElementById('total-duration');
 const playlistContainer = document.getElementById('playlist-container');
 const musicWaves = document.getElementById('music-waves');
-const albumCoverImg = document.getElementById('album-cover-img');
-const albumArtPlaceholder = document.getElementById('album-art-placeholder');
+const pixelSvgContainer = document.getElementById('pixel-svg-container');
 
 // Modal Admin
 const btnOpenAdminMusic = document.getElementById('btn-open-admin-music');
@@ -1061,29 +1067,56 @@ const btnVerifyAdmin = document.getElementById('btn-verify-admin');
 const addSongTitle = document.getElementById('add-song-title');
 const addSongArtist = document.getElementById('add-song-artist');
 const adminAudioInput = document.getElementById('admin-audio-input');
-const adminCoverInput = document.getElementById('admin-cover-input');
 const btnSaveNewSong = document.getElementById('btn-save-new-song');
 const adminDeleteList = document.getElementById('admin-delete-list');
+const pixelCoverOptions = document.querySelectorAll('.pixel-cover-option');
 
-// Load playlist tersimpan dari LocalStorage
-let playlist = JSON.parse(localStorage.getItem('mini_music_playlist') || '[]');
+let selectedPixelCover = 'vinyl';
+let playlist = [];
 let currentSongIndex = -1;
 let audioElement = new Audio();
 let isPlayingMusic = false;
 let isAdminAuthenticated = false;
 
-function savePlaylistToLocalStorage() {
-    try {
-        localStorage.setItem('mini_music_playlist', JSON.stringify(playlist));
-    } catch(e) {
-        alert("Penyimpanan lokal penuh. Gunakan lagu/gambar dengan ukuran file lebih kecil.");
+// Pilih Desain Pixel Cover
+pixelCoverOptions.forEach(opt => {
+    opt.addEventListener('click', () => {
+        pixelCoverOptions.forEach(o => o.classList.remove('selected'));
+        opt.classList.add('selected');
+        selectedPixelCover = opt.getAttribute('data-style');
+    });
+});
+
+// Ambil Playlist dari Supabase Database
+async function fetchPublicPlaylist() {
+    const { data: songs, error } = await supabaseClient
+        .from('songs')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+    if (!error && songs) {
+        playlist = songs;
+        renderPlaylistUI();
+        if (currentSongIndex === -1 && playlist.length > 0) {
+            loadSong(0, false);
+        }
     }
 }
+
+fetchPublicPlaylist();
+
+// Realtime Sync Musik untuk Semua Pengguna
+supabaseClient
+    .channel('public:songs')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'songs' }, () => {
+        fetchPublicPlaylist();
+    })
+    .subscribe();
 
 if (btnOpenMusic) {
     btnOpenMusic.addEventListener('click', () => {
         musicModal.classList.add('active');
-        renderPlaylistUI();
+        fetchPublicPlaylist();
     });
 }
 
@@ -1093,7 +1126,6 @@ if (btnCloseMusic) {
     });
 }
 
-// Buka Modal Admin
 if (btnOpenAdminMusic) {
     btnOpenAdminMusic.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -1114,11 +1146,9 @@ if (btnCloseAdminMusic) {
     });
 }
 
-// Verifikasi Password Admin
 if (btnVerifyAdmin) {
     btnVerifyAdmin.addEventListener('click', () => {
-        const inputPass = adminPassInput.value;
-        if (inputPass === ADMIN_PASSWORD) {
+        if (adminPassInput.value === ADMIN_PASSWORD) {
             isAdminAuthenticated = true;
             showAdminPanel();
         } else {
@@ -1133,68 +1163,60 @@ function showAdminPanel() {
     renderAdminDeleteList();
 }
 
-// Konversi File ke Data Base64 untuk Penyimpanan Permanen
-function fileToBase64(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = error => reject(error);
-    });
-}
-
-// Simpan Lagu Baru
+// Upload File Lagu ke Storage & Simpan Metadata ke Supabase
 if (btnSaveNewSong) {
     btnSaveNewSong.addEventListener('click', async () => {
         const title = addSongTitle.value.trim();
         const artist = addSongArtist.value.trim();
         const audioFile = adminAudioInput.files[0];
-        const coverFile = adminCoverInput.files[0];
 
         if (!audioFile) {
             alert('Pilih file audio lagu terlebih dahulu!');
             return;
         }
 
-        btnSaveNewSong.textContent = "Menyimpan...";
+        btnSaveNewSong.textContent = "Mengunggah...";
         btnSaveNewSong.disabled = true;
 
         try {
-            const audioBase64 = await fileToBase64(audioFile);
-            let coverBase64 = null;
-            if (coverFile) {
-                coverBase64 = await fileToBase64(coverFile);
-            }
+            const fileExt = audioFile.name.split('.').pop();
+            const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
 
+            const { error: uploadError } = await supabaseClient.storage
+                .from('music')
+                .upload(fileName, audioFile);
+
+            if (uploadError) throw uploadError;
+
+            const { data: publicUrlData } = supabaseClient.storage
+                .from('music')
+                .getPublicUrl(fileName);
+
+            const audioUrl = publicUrlData.publicUrl;
             const songName = title || audioFile.name.replace(/\.[^/.]+$/, "");
             const artistName = artist || "Artis Tidak Diketahui";
 
-            playlist.push({
+            const { error: insertError } = await supabaseClient.from('songs').insert([{
                 title: songName,
                 artist: artistName,
-                src: audioBase64,
-                cover: coverBase64
-            });
+                src: audioUrl,
+                cover_style: selectedPixelCover
+            }]);
 
-            savePlaylistToLocalStorage();
+            if (insertError) throw insertError;
 
             addSongTitle.value = '';
             addSongArtist.value = '';
             adminAudioInput.value = '';
-            adminCoverInput.value = '';
 
-            if (playlist.length === 1) {
-                loadSong(0);
-            } else {
-                renderPlaylistUI();
-            }
-
+            await fetchPublicPlaylist();
             renderAdminDeleteList();
-            alert('Lagu berhasil disimpan permanen!');
+            alert('Lagu berhasil diunggah ke database!');
         } catch(e) {
-            alert('Gagal mengunggah file. Pastikan ukuran file tidak terlalu besar.');
+            alert('Gagal mengunggah lagu. Pastikan bucket "music" di Supabase telah dibuat.');
+            console.error(e);
         } finally {
-            btnSaveNewSong.textContent = "Simpan Lagu";
+            btnSaveNewSong.textContent = "Unggah ke Database";
             btnSaveNewSong.disabled = false;
         }
     });
@@ -1207,7 +1229,7 @@ function renderAdminDeleteList() {
         return;
     }
 
-    playlist.forEach((song, idx) => {
+    playlist.forEach((song) => {
         const item = document.createElement('div');
         item.style.cssText = 'display: flex; justify-content: space-between; align-items: center; background: #111; padding: 6px 8px; border-radius: 4px; font-size: 11px;';
         item.innerHTML = `
@@ -1215,36 +1237,21 @@ function renderAdminDeleteList() {
             <button style="background: #dc3545; color: #fff; border: none; padding: 2px 6px; border-radius: 4px; font-size: 10px; cursor: pointer;">Hapus</button>
         `;
         item.querySelector('button').addEventListener('click', () => {
-            deleteSong(idx);
+            deleteSongFromDB(song.id);
         });
         adminDeleteList.appendChild(item);
     });
 }
 
-function deleteSong(index) {
-    if (confirm(`Yakin ingin menghapus lagu "${playlist[index].title}"?`)) {
-        if (currentSongIndex === index) {
-            pauseMusic();
-            audioElement.src = '';
-            currentSongIndex = -1;
-        } else if (currentSongIndex > index) {
-            currentSongIndex--;
-        }
-
-        playlist.splice(index, 1);
-        savePlaylistToLocalStorage();
-
-        if (playlist.length > 0 && currentSongIndex === -1) {
-            loadSong(0);
-        } else {
-            renderPlaylistUI();
-        }
-
+async function deleteSongFromDB(songId) {
+    if (confirm("Yakin ingin menghapus lagu ini dari database publik?")) {
+        await supabaseClient.from('songs').delete().eq('id', songId);
+        await fetchPublicPlaylist();
         renderAdminDeleteList();
     }
 }
 
-function loadSong(index) {
+function loadSong(index, autoPlay = true) {
     if (index < 0 || index >= playlist.length) return;
     currentSongIndex = index;
     const song = playlist[index];
@@ -1252,26 +1259,19 @@ function loadSong(index) {
     songTitleEl.textContent = song.title;
     songArtistEl.textContent = song.artist;
 
-    if (song.cover) {
-        albumCoverImg.src = song.cover;
-        albumCoverImg.style.display = 'block';
-        albumArtPlaceholder.style.display = 'none';
-    } else {
-        albumCoverImg.style.display = 'none';
-        albumArtPlaceholder.style.display = 'block';
-    }
+    pixelSvgContainer.innerHTML = PIXEL_COVERS[song.cover_style] || PIXEL_COVERS['vinyl'];
 
     audioElement.load();
     renderPlaylistUI();
+    if (autoPlay) playMusic();
 }
 
 function renderPlaylistUI() {
     playlistContainer.innerHTML = '';
     if (playlist.length === 0) {
         songTitleEl.textContent = "Belum Ada Lagu";
-        songArtistEl.textContent = "Silakan tambah lagu via kelola";
-        albumCoverImg.style.display = 'none';
-        albumArtPlaceholder.style.display = 'block';
+        songArtistEl.textContent = "Database masih kosong";
+        pixelSvgContainer.innerHTML = PIXEL_COVERS['vinyl'];
         playlistContainer.innerHTML = '<p style="font-size: 11px; color: #666; text-align: center; margin: 8px 0;">Belum ada lagu dalam daftar putar.</p>';
         return;
     }
@@ -1287,8 +1287,7 @@ function renderPlaylistUI() {
             <span style="font-size: 10px; color: #aaa;">${idx === currentSongIndex && isPlayingMusic ? 'Playing' : '▶'}</span>
         `;
         item.addEventListener('click', () => {
-            loadSong(idx);
-            playMusic();
+            loadSong(idx, true);
         });
         playlistContainer.appendChild(item);
     });
@@ -1296,11 +1295,12 @@ function renderPlaylistUI() {
 
 function playMusic() {
     if (playlist.length === 0) {
-        alert("Tambahkan lagu melalui menu Kelola Musik (Admin) terlebih dahulu!");
+        alert("Tidak ada lagu di database!");
         return;
     }
     if (currentSongIndex === -1 && playlist.length > 0) {
-        loadSong(0);
+        loadSong(0, true);
+        return;
     }
     
     audioElement.play().then(() => {
@@ -1333,8 +1333,7 @@ if (btnNextSong) {
     btnNextSong.addEventListener('click', () => {
         if (playlist.length === 0) return;
         currentSongIndex = (currentSongIndex + 1) % playlist.length;
-        loadSong(currentSongIndex);
-        playMusic();
+        loadSong(currentSongIndex, true);
     });
 }
 
@@ -1342,8 +1341,7 @@ if (btnPrevSong) {
     btnPrevSong.addEventListener('click', () => {
         if (playlist.length === 0) return;
         currentSongIndex = (currentSongIndex - 1 + playlist.length) % playlist.length;
-        loadSong(currentSongIndex);
-        playMusic();
+        loadSong(currentSongIndex, true);
     });
 }
 
@@ -1365,8 +1363,7 @@ songProgress.addEventListener('input', () => {
 audioElement.addEventListener('ended', () => {
     if (playlist.length === 0) return;
     currentSongIndex = (currentSongIndex + 1) % playlist.length;
-    loadSong(currentSongIndex);
-    playMusic();
+    loadSong(currentSongIndex, true);
 });
 
 function formatTime(seconds) {
@@ -1375,8 +1372,6 @@ function formatTime(seconds) {
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
 }
-
-renderPlaylistUI();
 
 function subscribeToRealtime() {
     if (chatSubscription) supabaseClient.removeChannel(chatSubscription);
