@@ -95,8 +95,9 @@ let localStream = null;
 let peerConnection = null;
 let signalingChannel = null;
 let isAudioOnlyCall = false;
+let iceCandidatesQueue = [];
 
-// Konfigurasi STUN/TURN Server Google & OpenRelay Gratis (Tanpa API Key/Metered Limit)
+// Konfigurasi STUN/TURN Server Google & OpenRelay Gratis
 const iceServersConfig = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -858,7 +859,7 @@ if (btnSend) {
     btnSend.addEventListener('click', sendMessage);
 }
 
-// --- FITUR NATIVE WEBRTC + SUPABASE SIGNALING ---
+// --- FITUR NATIVE WEBRTC + SUPABASE SIGNALING (DENGAN ICE BUFFER) ---
 function setupWebRTCSignaling() {
     if (signalingChannel) supabaseClient.removeChannel(signalingChannel);
 
@@ -877,15 +878,20 @@ function setupWebRTCSignaling() {
                     callStatusText.textContent = 'Panggilan Masuk...';
                     showWebRTCUI(data.isVideo);
                     if (!peerConnection) await createPeerConnection(data.isVideo);
+                    
                     await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+                    await processIceQueue();
                 } else if (data.type === 'answer') {
                     callStatusText.textContent = 'Terhubung!';
-                    if (peerConnection) {
+                    if (peerConnection && peerConnection.signalingState !== 'stable') {
                         await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+                        await processIceQueue();
                     }
                 } else if (data.type === 'ice-candidate') {
-                    if (peerConnection && data.candidate) {
+                    if (peerConnection && peerConnection.remoteDescription && peerConnection.remoteDescription.type) {
                         await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                    } else {
+                        iceCandidatesQueue.push(data.candidate);
                     }
                 } else if (data.type === 'end-call') {
                     endWebRTCCall(false);
@@ -901,6 +907,17 @@ function setupWebRTCSignaling() {
         });
 }
 
+async function processIceQueue() {
+    while (iceCandidatesQueue.length > 0) {
+        const candidate = iceCandidatesQueue.shift();
+        try {
+            await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (e) {
+            console.error("Gagal memproses antrean ICE:", e);
+        }
+    }
+}
+
 function sendSignal(type, payloadData = {}) {
     if (signalingChannel) {
         signalingChannel.send({
@@ -912,6 +929,7 @@ function sendSignal(type, payloadData = {}) {
 }
 
 async function createPeerConnection(isVideo) {
+    iceCandidatesQueue = [];
     peerConnection = new RTCPeerConnection(iceServersConfig);
 
     peerConnection.onicecandidate = (event) => {
@@ -941,7 +959,7 @@ async function createPeerConnection(isVideo) {
         });
     } catch (err) {
         console.error("Akses media gagal:", err);
-        alert('Gagal mengakses Mikrofon/Kamera. Pastikan situs menggunakan HTTPS dan izin telah diaktifkan.');
+        alert('Gagal mengakses Mikrofon/Kamera. Pastikan situs menggunakan HTTPS dan izin telah diaktifkan di browser.');
         endWebRTCCall(true);
     }
 }
@@ -1003,6 +1021,7 @@ function endWebRTCCall(notifyPeer = true) {
     if (localVideo) localVideo.srcObject = null;
     if (remoteVideo) remoteVideo.srcObject = null;
 
+    iceCandidatesQueue = [];
     webrtcCallModal.classList.remove('active');
 }
 
