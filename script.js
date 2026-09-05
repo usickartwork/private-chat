@@ -194,12 +194,11 @@ btnLogin.addEventListener('click', async () => {
     showHomeScreen(true);
 });
 
-// --- INISIALISASI ENGINE PEERJS TELEPON ---
+// --- INISIALISASI ENGINE PEERJS DENGAN TURN RELAY SERVER ---
 function initPeerJS() {
     if (!currentUserId) return;
     if (peer) peer.destroy();
 
-    // Format ID Peer unik berdasarkan User ID Supabase
     const peerId = `textinaja-peer-${currentUserId.replace(/-/g, '')}`;
 
     peer = new Peer(peerId, {
@@ -208,7 +207,17 @@ function initPeerJS() {
             iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
                 { urls: 'stun:stun1.l.google.com:19302' },
-                { urls: 'stun:global.stun.twilio.com:3478' }
+                { urls: 'stun:global.stun.twilio.com:3478' },
+                {
+                    urls: 'turn:openrelay.metered.ca:80',
+                    username: 'openrelay',
+                    credential: 'openrelay'
+                },
+                {
+                    urls: 'turn:openrelay.metered.ca:443',
+                    username: 'openrelay',
+                    credential: 'openrelay'
+                }
             ]
         }
     });
@@ -225,7 +234,6 @@ function initPeerJS() {
         callStatusText.textContent = 'Panggilan Masuk...';
         showWebRTCUI(isVideoCall);
 
-        // Jika user mengklik Angkat Panggilan
         window.acceptPeerCall = async () => {
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({
