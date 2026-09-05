@@ -97,8 +97,9 @@ let signalingChannel = null;
 let isAudioOnlyCall = false;
 let iceCandidatesQueue = [];
 let isSettingRemoteAnswerPending = false;
+let connectionTimeout = null;
 
-// Konfigurasi STUN/TURN Server Google & OpenRelay Gratis
+// Konfigurasi STUN & TURN Server Kompatibel ISP Lokal
 const iceServersConfig = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -106,6 +107,8 @@ const iceServersConfig = {
         { urls: 'stun:stun2.l.google.com:19302' },
         { urls: 'stun:stun3.l.google.com:19302' },
         { urls: 'stun:stun4.l.google.com:19302' },
+        { urls: 'stun:global.stun.twilio.com:3478' },
+        { urls: 'stun:stun.services.mozilla.com' },
         {
             urls: 'turn:openrelay.metered.ca:80',
             username: 'openrelay',
@@ -121,7 +124,8 @@ const iceServersConfig = {
             username: 'openrelay',
             credential: 'openrelay'
         }
-    ]
+    ],
+    iceCandidatePoolSize: 10
 };
 
 // Elemen Game Tic-Tac-Toe
@@ -860,7 +864,7 @@ if (btnSend) {
     btnSend.addEventListener('click', sendMessage);
 }
 
-// --- FITUR NATIVE WEBRTC + SUPABASE SIGNALING (DENGAN ICE BUFFER & HANDSHAKE RESOLVER) ---
+// --- FITUR NATIVE WEBRTC + SUPABASE SIGNALING ---
 function setupWebRTCSignaling() {
     if (signalingChannel) supabaseClient.removeChannel(signalingChannel);
 
@@ -953,16 +957,31 @@ async function createPeerConnection(isVideo) {
         if (event.streams && event.streams[0]) {
             remoteVideo.srcObject = event.streams[0];
             callStatusText.textContent = 'Terhubung!';
+            if (connectionTimeout) clearTimeout(connectionTimeout);
         }
     };
 
     peerConnection.oniceconnectionstatechange = () => {
         if (peerConnection) {
             const state = peerConnection.iceConnectionState;
+            console.log("Status ICE Connection:", state);
+
             if (state === 'connected' || state === 'completed') {
                 callStatusText.textContent = 'Terhubung!';
+                if (connectionTimeout) clearTimeout(connectionTimeout);
+            } else if (state === 'checking') {
+                callStatusText.textContent = 'Menghubungkan jalur...';
+                
+                if (connectionTimeout) clearTimeout(connectionTimeout);
+                connectionTimeout = setTimeout(() => {
+                    if (peerConnection && peerConnection.iceConnectionState !== 'connected' && peerConnection.iceConnectionState !== 'completed') {
+                        alert('Gagal menghubungkan panggilan. Jalur jaringan diblokir oleh ISP/Router.');
+                        endWebRTCCall(true);
+                    }
+                }, 12000);
             } else if (state === 'disconnected' || state === 'failed') {
                 callStatusText.textContent = 'Koneksi Terputus';
+                if (connectionTimeout) clearTimeout(connectionTimeout);
             }
         }
     };
@@ -1028,6 +1047,11 @@ async function answerWebRTCCall(isVideo = false) {
 function endWebRTCCall(notifyPeer = true) {
     if (notifyPeer) {
         sendSignal('end-call');
+    }
+
+    if (connectionTimeout) {
+        clearTimeout(connectionTimeout);
+        connectionTimeout = null;
     }
 
     if (peerConnection) {
