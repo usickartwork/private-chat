@@ -119,6 +119,7 @@ window.addEventListener('popstate', (event) => {
     messageOptionsModal.classList.remove('active');
     if (gameModal) gameModal.classList.remove('active');
     if (musicModal) musicModal.classList.remove('active');
+    if (musicAdminModal) musicAdminModal.classList.remove('active');
 
     if (chatScreen && chatScreen.classList.contains('active')) {
         closeChatRoomInternal(false);
@@ -1026,11 +1027,15 @@ function handleIncomingGameMessage(msg) {
     }
 }
 
-// --- LOGIKA PEMUTAR MUSIK (SPOTIFY STYLE) ---
+// --- LOGIKA PEMUTAR MUSIK (MINI MUSIC WITH PERMANENT LOCALSTORAGE) ---
+const ADMIN_PASSWORD = "admin123";
+
 const btnOpenMusic = document.getElementById('btn-open-music');
 const musicModal = document.getElementById('music-modal');
 const btnCloseMusic = document.getElementById('btn-close-music');
 const btnPlayPause = document.getElementById('btn-play-pause');
+const svgIconPlay = document.getElementById('svg-icon-play');
+const svgIconPause = document.getElementById('svg-icon-pause');
 const btnPrevSong = document.getElementById('btn-prev-song');
 const btnNextSong = document.getElementById('btn-next-song');
 const songTitleEl = document.getElementById('song-title');
@@ -1040,15 +1045,40 @@ const currentTimeEl = document.getElementById('current-time');
 const totalDurationEl = document.getElementById('total-duration');
 const playlistContainer = document.getElementById('playlist-container');
 const musicWaves = document.getElementById('music-waves');
-const btnUploadMusic = document.getElementById('btn-upload-music');
-const uploadMusicFile = document.getElementById('upload-music-file');
+const albumCoverImg = document.getElementById('album-cover-img');
+const albumArtPlaceholder = document.getElementById('album-art-placeholder');
 
-// Playlist awal dibuat kosong (tanpa lagu dummy)
-const playlist = [];
+// Modal Admin
+const btnOpenAdminMusic = document.getElementById('btn-open-admin-music');
+const musicAdminModal = document.getElementById('music-admin-modal');
+const btnCloseAdminMusic = document.getElementById('btn-close-admin-music');
+const adminAuthSection = document.getElementById('admin-auth-section');
+const adminPanelSection = document.getElementById('admin-panel-section');
+const adminPassInput = document.getElementById('admin-pass-input');
+const btnVerifyAdmin = document.getElementById('btn-verify-admin');
 
+// Form Admin Inputs
+const addSongTitle = document.getElementById('add-song-title');
+const addSongArtist = document.getElementById('add-song-artist');
+const adminAudioInput = document.getElementById('admin-audio-input');
+const adminCoverInput = document.getElementById('admin-cover-input');
+const btnSaveNewSong = document.getElementById('btn-save-new-song');
+const adminDeleteList = document.getElementById('admin-delete-list');
+
+// Load playlist tersimpan dari LocalStorage
+let playlist = JSON.parse(localStorage.getItem('mini_music_playlist') || '[]');
 let currentSongIndex = -1;
 let audioElement = new Audio();
 let isPlayingMusic = false;
+let isAdminAuthenticated = false;
+
+function savePlaylistToLocalStorage() {
+    try {
+        localStorage.setItem('mini_music_playlist', JSON.stringify(playlist));
+    } catch(e) {
+        alert("Penyimpanan lokal penuh. Gunakan lagu/gambar dengan ukuran file lebih kecil.");
+    }
+}
 
 if (btnOpenMusic) {
     btnOpenMusic.addEventListener('click', () => {
@@ -1063,12 +1093,174 @@ if (btnCloseMusic) {
     });
 }
 
+// Buka Modal Admin
+if (btnOpenAdminMusic) {
+    btnOpenAdminMusic.addEventListener('click', (e) => {
+        e.stopPropagation();
+        musicAdminModal.classList.add('active');
+        if (!isAdminAuthenticated) {
+            adminAuthSection.style.display = 'block';
+            adminPanelSection.style.display = 'none';
+            adminPassInput.value = '';
+        } else {
+            showAdminPanel();
+        }
+    });
+}
+
+if (btnCloseAdminMusic) {
+    btnCloseAdminMusic.addEventListener('click', () => {
+        musicAdminModal.classList.remove('active');
+    });
+}
+
+// Verifikasi Password Admin
+if (btnVerifyAdmin) {
+    btnVerifyAdmin.addEventListener('click', () => {
+        const inputPass = adminPassInput.value;
+        if (inputPass === ADMIN_PASSWORD) {
+            isAdminAuthenticated = true;
+            showAdminPanel();
+        } else {
+            alert('Password Admin Salah!');
+        }
+    });
+}
+
+function showAdminPanel() {
+    adminAuthSection.style.display = 'none';
+    adminPanelSection.style.display = 'block';
+    renderAdminDeleteList();
+}
+
+// Konversi File ke Data Base64 untuk Penyimpanan Permanen
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+    });
+}
+
+// Simpan Lagu Baru
+if (btnSaveNewSong) {
+    btnSaveNewSong.addEventListener('click', async () => {
+        const title = addSongTitle.value.trim();
+        const artist = addSongArtist.value.trim();
+        const audioFile = adminAudioInput.files[0];
+        const coverFile = adminCoverInput.files[0];
+
+        if (!audioFile) {
+            alert('Pilih file audio lagu terlebih dahulu!');
+            return;
+        }
+
+        btnSaveNewSong.textContent = "Menyimpan...";
+        btnSaveNewSong.disabled = true;
+
+        try {
+            const audioBase64 = await fileToBase64(audioFile);
+            let coverBase64 = null;
+            if (coverFile) {
+                coverBase64 = await fileToBase64(coverFile);
+            }
+
+            const songName = title || audioFile.name.replace(/\.[^/.]+$/, "");
+            const artistName = artist || "Artis Tidak Diketahui";
+
+            playlist.push({
+                title: songName,
+                artist: artistName,
+                src: audioBase64,
+                cover: coverBase64
+            });
+
+            savePlaylistToLocalStorage();
+
+            addSongTitle.value = '';
+            addSongArtist.value = '';
+            adminAudioInput.value = '';
+            adminCoverInput.value = '';
+
+            if (playlist.length === 1) {
+                loadSong(0);
+            } else {
+                renderPlaylistUI();
+            }
+
+            renderAdminDeleteList();
+            alert('Lagu berhasil disimpan permanen!');
+        } catch(e) {
+            alert('Gagal mengunggah file. Pastikan ukuran file tidak terlalu besar.');
+        } finally {
+            btnSaveNewSong.textContent = "Simpan Lagu";
+            btnSaveNewSong.disabled = false;
+        }
+    });
+}
+
+function renderAdminDeleteList() {
+    adminDeleteList.innerHTML = '';
+    if (playlist.length === 0) {
+        adminDeleteList.innerHTML = '<p style="font-size: 11px; color: #777; margin: 0;">Belum ada lagu.</p>';
+        return;
+    }
+
+    playlist.forEach((song, idx) => {
+        const item = document.createElement('div');
+        item.style.cssText = 'display: flex; justify-content: space-between; align-items: center; background: #111; padding: 6px 8px; border-radius: 4px; font-size: 11px;';
+        item.innerHTML = `
+            <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;">${song.title}</span>
+            <button style="background: #dc3545; color: #fff; border: none; padding: 2px 6px; border-radius: 4px; font-size: 10px; cursor: pointer;">Hapus</button>
+        `;
+        item.querySelector('button').addEventListener('click', () => {
+            deleteSong(idx);
+        });
+        adminDeleteList.appendChild(item);
+    });
+}
+
+function deleteSong(index) {
+    if (confirm(`Yakin ingin menghapus lagu "${playlist[index].title}"?`)) {
+        if (currentSongIndex === index) {
+            pauseMusic();
+            audioElement.src = '';
+            currentSongIndex = -1;
+        } else if (currentSongIndex > index) {
+            currentSongIndex--;
+        }
+
+        playlist.splice(index, 1);
+        savePlaylistToLocalStorage();
+
+        if (playlist.length > 0 && currentSongIndex === -1) {
+            loadSong(0);
+        } else {
+            renderPlaylistUI();
+        }
+
+        renderAdminDeleteList();
+    }
+}
+
 function loadSong(index) {
     if (index < 0 || index >= playlist.length) return;
     currentSongIndex = index;
-    audioElement.src = playlist[index].src;
-    songTitleEl.textContent = playlist[index].title;
-    songArtistEl.textContent = playlist[index].artist;
+    const song = playlist[index];
+    audioElement.src = song.src;
+    songTitleEl.textContent = song.title;
+    songArtistEl.textContent = song.artist;
+
+    if (song.cover) {
+        albumCoverImg.src = song.cover;
+        albumCoverImg.style.display = 'block';
+        albumArtPlaceholder.style.display = 'none';
+    } else {
+        albumCoverImg.style.display = 'none';
+        albumArtPlaceholder.style.display = 'block';
+    }
+
     audioElement.load();
     renderPlaylistUI();
 }
@@ -1077,7 +1269,9 @@ function renderPlaylistUI() {
     playlistContainer.innerHTML = '';
     if (playlist.length === 0) {
         songTitleEl.textContent = "Belum Ada Lagu";
-        songArtistEl.textContent = "Silakan tambah lagu";
+        songArtistEl.textContent = "Silakan tambah lagu via kelola";
+        albumCoverImg.style.display = 'none';
+        albumArtPlaceholder.style.display = 'block';
         playlistContainer.innerHTML = '<p style="font-size: 11px; color: #666; text-align: center; margin: 8px 0;">Belum ada lagu dalam daftar putar.</p>';
         return;
     }
@@ -1087,10 +1281,10 @@ function renderPlaylistUI() {
         item.style.cssText = `display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; border-radius: 6px; cursor: pointer; background: ${idx === currentSongIndex ? '#282828' : 'transparent'};`;
         item.innerHTML = `
             <div>
-                <div style="font-size: 12px; font-weight: 500; color: ${idx === currentSongIndex ? '#1db954' : '#fff'};">${song.title}</div>
+                <div style="font-size: 12px; font-weight: 500; color: ${idx === currentSongIndex ? '#ffffff' : '#ccc'};">${song.title}</div>
                 <div style="font-size: 10px; color: #888;">${song.artist}</div>
             </div>
-            <span style="font-size: 11px; color: #aaa;">${idx === currentSongIndex && isPlayingMusic ? '▶ playing' : '▶'}</span>
+            <span style="font-size: 10px; color: #aaa;">${idx === currentSongIndex && isPlayingMusic ? 'Playing' : '▶'}</span>
         `;
         item.addEventListener('click', () => {
             loadSong(idx);
@@ -1102,7 +1296,7 @@ function renderPlaylistUI() {
 
 function playMusic() {
     if (playlist.length === 0) {
-        alert("Tambahkan lagu dari perangkat terlebih dahulu!");
+        alert("Tambahkan lagu melalui menu Kelola Musik (Admin) terlebih dahulu!");
         return;
     }
     if (currentSongIndex === -1 && playlist.length > 0) {
@@ -1111,7 +1305,8 @@ function playMusic() {
     
     audioElement.play().then(() => {
         isPlayingMusic = true;
-        btnPlayPause.textContent = '⏸';
+        svgIconPlay.style.display = 'none';
+        svgIconPause.style.display = 'block';
         musicWaves.style.opacity = '1';
         renderPlaylistUI();
     }).catch(err => {
@@ -1122,7 +1317,8 @@ function playMusic() {
 function pauseMusic() {
     audioElement.pause();
     isPlayingMusic = false;
-    btnPlayPause.textContent = '▶';
+    svgIconPlay.style.display = 'block';
+    svgIconPause.style.display = 'none';
     musicWaves.style.opacity = '0';
     renderPlaylistUI();
 }
@@ -1148,39 +1344,6 @@ if (btnPrevSong) {
         currentSongIndex = (currentSongIndex - 1 + playlist.length) % playlist.length;
         loadSong(currentSongIndex);
         playMusic();
-    });
-}
-
-if (btnUploadMusic) {
-    btnUploadMusic.addEventListener('click', () => uploadMusicFile.click());
-}
-
-if (uploadMusicFile) {
-    uploadMusicFile.addEventListener('change', (e) => {
-        const files = e.target.files;
-        if (!files || files.length === 0) return;
-
-        const previousLength = playlist.length;
-
-        for (let i = 0; i < files.length; i++) {
-            const file = files[i];
-            const fileObjectURL = URL.createObjectURL(file);
-            const songName = file.name.replace(/\.[^/.]+$/, "");
-
-            playlist.push({
-                title: songName,
-                artist: "Lokal / Perangkat",
-                src: fileObjectURL
-            });
-        }
-
-        renderPlaylistUI();
-
-        if (previousLength === 0 && playlist.length > 0) {
-            loadSong(0);
-        }
-
-        alert(`${files.length} lagu berhasil ditambahkan ke pemutar musik!`);
     });
 }
 
