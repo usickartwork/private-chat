@@ -118,6 +118,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 window.addEventListener('popstate', (event) => {
     messageOptionsModal.classList.remove('active');
     if (gameModal) gameModal.classList.remove('active');
+    if (musicModal) musicModal.classList.remove('active');
 
     if (chatScreen && chatScreen.classList.contains('active')) {
         closeChatRoomInternal(false);
@@ -1024,6 +1025,175 @@ function handleIncomingGameMessage(msg) {
         console.error("Gagal memproses pesan game", e);
     }
 }
+
+// --- LOGIKA PEMUTAR MUSIK (SPOTIFY STYLE) ---
+const btnOpenMusic = document.getElementById('btn-open-music');
+const musicModal = document.getElementById('music-modal');
+const btnCloseMusic = document.getElementById('btn-close-music');
+const btnPlayPause = document.getElementById('btn-play-pause');
+const btnPrevSong = document.getElementById('btn-prev-song');
+const btnNextSong = document.getElementById('btn-next-song');
+const songTitleEl = document.getElementById('song-title');
+const songArtistEl = document.getElementById('song-artist');
+const songProgress = document.getElementById('song-progress');
+const currentTimeEl = document.getElementById('current-time');
+const totalDurationEl = document.getElementById('total-duration');
+const playlistContainer = document.getElementById('playlist-container');
+const musicWaves = document.getElementById('music-waves');
+const btnUploadMusic = document.getElementById('btn-upload-music');
+const uploadMusicFile = document.getElementById('upload-music-file');
+
+const playlist = [
+    {
+        title: "Lofi Study Beats",
+        artist: "Chillhop Music",
+        src: "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf756.mp3?filename=lofi-study-112191.mp3"
+    },
+    {
+        title: "Ambient Chill",
+        artist: "Relaxing Sounds",
+        src: "https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3?filename=chill-abstract-intention-12099.mp3"
+    }
+];
+
+let currentSongIndex = 0;
+let audioElement = new Audio(playlist[0].src);
+let isPlayingMusic = false;
+
+if (btnOpenMusic) {
+    btnOpenMusic.addEventListener('click', () => {
+        musicModal.classList.add('active');
+        renderPlaylistUI();
+    });
+}
+
+if (btnCloseMusic) {
+    btnCloseMusic.addEventListener('click', () => {
+        musicModal.classList.remove('active');
+    });
+}
+
+function loadSong(index) {
+    currentSongIndex = index;
+    audioElement.src = playlist[index].src;
+    songTitleEl.textContent = playlist[index].title;
+    songArtistEl.textContent = playlist[index].artist;
+    audioElement.load();
+    renderPlaylistUI();
+}
+
+function renderPlaylistUI() {
+    playlistContainer.innerHTML = '';
+    playlist.forEach((song, idx) => {
+        const item = document.createElement('div');
+        item.style.cssText = `display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; border-radius: 6px; cursor: pointer; background: ${idx === currentSongIndex ? '#282828' : 'transparent'};`;
+        item.innerHTML = `
+            <div>
+                <div style="font-size: 12px; font-weight: 500; color: ${idx === currentSongIndex ? '#1db954' : '#fff'};">${song.title}</div>
+                <div style="font-size: 10px; color: #888;">${song.artist}</div>
+            </div>
+            <span style="font-size: 11px; color: #aaa;">${idx === currentSongIndex ? 'playing' : '▶'}</span>
+        `;
+        item.addEventListener('click', () => {
+            loadSong(idx);
+            playMusic();
+        });
+        playlistContainer.appendChild(item);
+    });
+}
+
+function playMusic() {
+    audioElement.play().then(() => {
+        isPlayingMusic = true;
+        btnPlayPause.textContent = '⏸';
+        musicWaves.style.opacity = '1';
+    }).catch(err => {
+        console.log("Autoplay diblokir", err);
+    });
+}
+
+function pauseMusic() {
+    audioElement.pause();
+    isPlayingMusic = false;
+    btnPlayPause.textContent = '▶';
+    musicWaves.style.opacity = '0';
+}
+
+if (btnPlayPause) {
+    btnPlayPause.addEventListener('click', () => {
+        if (isPlayingMusic) { pauseMusic(); } else { playMusic(); }
+    });
+}
+
+if (btnNextSong) {
+    btnNextSong.addEventListener('click', () => {
+        currentSongIndex = (currentSongIndex + 1) % playlist.length;
+        loadSong(currentSongIndex);
+        playMusic();
+    });
+}
+
+if (btnPrevSong) {
+    btnPrevSong.addEventListener('click', () => {
+        currentSongIndex = (currentSongIndex - 1 + playlist.length) % playlist.length;
+        loadSong(currentSongIndex);
+        playMusic();
+    });
+}
+
+if (btnUploadMusic) {
+    btnUploadMusic.addEventListener('click', () => uploadMusicFile.click());
+}
+
+if (uploadMusicFile) {
+    uploadMusicFile.addEventListener('change', (e) => {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const fileObjectURL = URL.createObjectURL(file);
+            const songName = file.name.replace(/\.[^/.]+$/, "");
+
+            playlist.push({
+                title: songName,
+                artist: "Lokal / Perangkat",
+                src: fileObjectURL
+            });
+        }
+        renderPlaylistUI();
+        alert(`${files.length} lagu lokal berhasil ditambahkan!`);
+    });
+}
+
+audioElement.addEventListener('timeupdate', () => {
+    if (audioElement.duration) {
+        const progressPercent = (audioElement.currentTime / audioElement.duration) * 100;
+        songProgress.value = progressPercent;
+        currentTimeEl.textContent = formatTime(audioElement.currentTime);
+        totalDurationEl.textContent = formatTime(audioElement.duration);
+    }
+});
+
+songProgress.addEventListener('input', () => {
+    if (audioElement.duration) {
+        audioElement.currentTime = (songProgress.value / 100) * audioElement.duration;
+    }
+});
+
+audioElement.addEventListener('ended', () => {
+    currentSongIndex = (currentSongIndex + 1) % playlist.length;
+    loadSong(currentSongIndex);
+    playMusic();
+});
+
+function formatTime(seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+}
+
+loadSong(0);
 
 function subscribeToRealtime() {
     if (chatSubscription) supabaseClient.removeChannel(chatSubscription);
