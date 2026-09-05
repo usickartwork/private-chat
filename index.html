@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Textinaja - Aplikasi Chat & Panggilan</title>
+    <title>Textinaja - Chat & Call</title>
     
     <!-- Supabase JS Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -20,8 +20,8 @@
         }
 
         body {
-            background-color: #121212;
-            color: #e0e0e0;
+            background-color: #0b0b0b;
+            color: #f5f5f7;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -34,10 +34,10 @@
             width: 100%;
             max-width: 480px;
             height: 100%;
-            background: #181818;
+            background: #121212;
             flex-direction: column;
             position: relative;
-            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            box-shadow: 0 0 30px rgba(0,0,0,0.9);
         }
 
         .screen.active {
@@ -55,16 +55,16 @@
 
         .auth-title {
             font-size: 28px;
-            font-weight: bold;
+            font-weight: 700;
             color: #fff;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             text-align: center;
         }
 
         .auth-subtitle {
-            font-size: 14px;
+            font-size: 13px;
             color: #888;
-            margin-bottom: 32px;
+            margin-bottom: 28px;
             text-align: center;
         }
 
@@ -74,16 +74,19 @@
 
         .input-group label {
             display: block;
-            font-size: 12px;
+            font-size: 11px;
+            font-weight: 600;
             color: #aaa;
             margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .input-group input {
             width: 100%;
-            padding: 12px 16px;
-            background: #242424;
-            border: 1px solid #333;
+            padding: 12px 14px;
+            background: #1e1e1e;
+            border: 1px solid #2c2c2c;
             border-radius: 8px;
             color: #fff;
             font-size: 14px;
@@ -99,13 +102,13 @@
             width: 100%;
             padding: 12px;
             background: #1db954;
-            color: #121212;
+            color: #0b0b0b;
             border: none;
             border-radius: 8px;
-            font-weight: bold;
+            font-weight: 700;
             font-size: 14px;
             cursor: pointer;
-            margin-top: 8px;
+            margin-top: 6px;
             transition: background 0.2s;
         }
 
@@ -116,37 +119,37 @@
         .auth-switch {
             text-align: center;
             margin-top: 24px;
-            font-size: 13px;
+            font-size: 12px;
             color: #888;
         }
 
         .auth-switch span {
             color: #1db954;
             cursor: pointer;
-            font-weight: 500;
+            font-weight: 600;
         }
 
         .error-msg {
             color: #ff5555;
             font-size: 12px;
             text-align: center;
-            margin-top: 12px;
+            margin-top: 10px;
         }
 
         /* --- HEADER UMUM --- */
         .app-header {
-            padding: 16px 20px;
-            background: #202020;
+            padding: 14px 18px;
+            background: #181818;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            border-bottom: 1px solid #282828;
+            border-bottom: 1px solid #222;
         }
 
         .header-profile {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
             cursor: pointer;
         }
 
@@ -154,7 +157,7 @@
             width: 36px;
             height: 36px;
             border-radius: 50%;
-            background: #333;
+            background: #2a2a2a;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -162,6 +165,7 @@
             color: #fff;
             overflow: hidden;
             font-size: 14px;
+            border: 1px solid #333;
         }
 
         .avatar-circle img {
@@ -178,7 +182,7 @@
 
         .header-actions {
             display: flex;
-            gap: 12px;
+            gap: 8px;
         }
 
         .icon-btn {
@@ -187,14 +191,18 @@
             color: #aaa;
             font-size: 18px;
             cursor: pointer;
-            padding: 6px;
+            width: 36px;
+            height: 36px;
             border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             transition: color 0.2s, background 0.2s;
         }
 
         .icon-btn:hover {
             color: #fff;
-            background: rgba(255,255,255,0.05);
+            background: rgba(255,255,255,0.06);
         }
 
         /* --- HOME SCREEN --- */
@@ -206,9 +214,9 @@
         }
 
         .add-friend-section {
-            padding: 16px 20px;
-            background: #1f1f1f;
-            border-bottom: 1px solid #282828;
+            padding: 14px 18px;
+            background: #161616;
+            border-bottom: 1px solid #222;
         }
 
         .add-friend-row {
@@ -219,9 +227,9 @@
         .add-friend-row input {
             flex: 1;
             padding: 10px 14px;
-            background: #2a2a2a;
-            border: 1px solid #333;
-            border-radius: 6px;
+            background: #202020;
+            border: 1px solid #2c2c2c;
+            border-radius: 8px;
             color: #fff;
             font-size: 13px;
             outline: none;
@@ -232,8 +240,8 @@
             background: #fff;
             color: #121212;
             border: none;
-            border-radius: 6px;
-            font-weight: bold;
+            border-radius: 8px;
+            font-weight: 700;
             font-size: 13px;
             cursor: pointer;
         }
@@ -246,19 +254,19 @@
         .friend-item {
             display: flex;
             align-items: center;
-            padding: 14px 20px;
-            gap: 14px;
+            padding: 12px 18px;
+            gap: 12px;
             cursor: pointer;
-            border-bottom: 1px solid #222;
+            border-bottom: 1px solid #1a1a1a;
             transition: background 0.2s;
         }
 
         .friend-item:hover {
-            background: #202020;
+            background: #181818;
         }
 
         .friend-item.unread {
-            background: rgba(29, 185, 84, 0.05);
+            background: rgba(29, 185, 84, 0.04);
         }
 
         .friend-info {
@@ -270,7 +278,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 4px;
+            margin-bottom: 3px;
         }
 
         .friend-name {
@@ -303,7 +311,7 @@
             background: #1db954;
             color: #121212;
             font-size: 10px;
-            font-weight: bold;
+            font-weight: 700;
             padding: 2px 6px;
             border-radius: 10px;
         }
@@ -327,7 +335,7 @@
             width: 90px;
             height: 90px;
             border-radius: 50%;
-            background: #333;
+            background: #2a2a2a;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -335,13 +343,7 @@
             font-weight: bold;
             color: #fff;
             overflow: hidden;
-            border: 2px solid #444;
-        }
-
-        .profile-large-avatar img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
+            border: 2px solid #333;
         }
 
         .camera-overlay {
@@ -357,7 +359,7 @@
             align-items: center;
             justify-content: center;
             font-size: 12px;
-            border: 2px solid #181818;
+            border: 2px solid #121212;
         }
 
         .profile-username {
@@ -376,7 +378,7 @@
 
         .profile-menu-item {
             padding: 14px 16px;
-            background: #222;
+            background: #1a1a1a;
             border-radius: 8px;
             font-size: 13px;
             color: #ccc;
@@ -384,27 +386,28 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            border: 1px solid #222;
         }
 
         .profile-menu-item:hover {
-            background: #282828;
+            background: #222;
             color: #fff;
         }
 
         /* --- CHAT SCREEN --- */
         .chat-header {
-            padding: 12px 16px;
-            background: #202020;
+            padding: 10px 16px;
+            background: #181818;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            border-bottom: 1px solid #282828;
+            border-bottom: 1px solid #222;
         }
 
         .chat-header-left {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
         }
 
         .chat-header-info {
@@ -425,7 +428,7 @@
 
         .chat-header-right {
             display: flex;
-            gap: 8px;
+            gap: 4px;
         }
 
         .chat-messages {
@@ -435,7 +438,7 @@
             display: flex;
             flex-direction: column;
             gap: 8px;
-            background: #121212;
+            background: #0e0e0e;
         }
 
         .message-wrapper {
@@ -456,25 +459,26 @@
             padding: 10px 14px;
             border-radius: 12px;
             font-size: 13px;
-            line-height: 1.4;
+            line-height: 1.45;
             position: relative;
             word-break: break-word;
         }
 
         .message-item.outgoing {
             background: #1db954;
-            color: #121212;
+            color: #0b0b0b;
             border-top-right-radius: 2px;
+            font-weight: 500;
         }
 
         .message-item.incoming {
-            background: #262626;
+            background: #202020;
             color: #e0e0e0;
             border-top-left-radius: 2px;
         }
 
         .quoted-msg {
-            background: rgba(0,0,0,0.15);
+            background: rgba(0,0,0,0.2);
             padding: 6px 10px;
             border-left: 3px solid rgba(255,255,255,0.7);
             border-radius: 4px;
@@ -495,31 +499,31 @@
             gap: 4px;
             margin-top: 4px;
             font-size: 10px;
-            color: rgba(255,255,255,0.6);
+            color: rgba(0,0,0,0.6);
         }
 
         .message-item.incoming .msg-footer {
-            color: #888;
+            color: #777;
         }
 
         .msg-status.read {
-            color: #0056b3;
+            color: #004085;
             font-weight: bold;
         }
 
         /* Input Chat Area */
         .chat-input-area {
-            background: #202020;
+            background: #181818;
             padding: 10px 16px;
             display: flex;
             flex-direction: column;
-            border-top: 1px solid #282828;
+            border-top: 1px solid #222;
             position: relative;
         }
 
         .reply-preview-box {
             display: none;
-            background: #262626;
+            background: #202020;
             padding: 8px 12px;
             border-radius: 6px;
             margin-bottom: 8px;
@@ -536,14 +540,14 @@
         .chat-input-row {
             display: flex;
             align-items: flex-end;
-            gap: 10px;
+            gap: 8px;
         }
 
         .chat-input-row textarea {
             flex: 1;
             padding: 10px 14px;
-            background: #2a2a2a;
-            border: 1px solid #333;
+            background: #222;
+            border: 1px solid #2c2c2c;
             border-radius: 20px;
             color: #fff;
             font-size: 13px;
@@ -555,7 +559,7 @@
 
         .btn-send {
             background: #1db954;
-            color: #121212;
+            color: #0b0b0b;
             border: none;
             width: 38px;
             height: 38px;
@@ -597,16 +601,16 @@
             position: absolute;
             bottom: 65px;
             left: 16px;
-            background: #242424;
-            border: 1px solid #333;
+            background: #1e1e1e;
+            border: 1px solid #2c2c2c;
             border-radius: 12px;
-            padding: 8px;
+            padding: 6px;
             display: none;
             flex-direction: column;
             gap: 4px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.6);
             z-index: 10;
-            min-width: 160px;
+            min-width: 180px;
         }
 
         .chat-plus-popup.active {
@@ -628,7 +632,7 @@
         }
 
         .popup-menu-item:hover {
-            background: #2e2e2e;
+            background: #282828;
             color: #fff;
         }
 
@@ -752,8 +756,8 @@
             margin: 20px 0;
         }
         .game-cell {
-            background: #242424;
-            border: 1px solid #333;
+            background: #1e1e1e;
+            border: 1px solid #2c2c2c;
             border-radius: 8px;
             font-size: 32px;
             font-weight: bold;
@@ -763,13 +767,13 @@
             justify-content: center;
             cursor: pointer;
         }
-        .game-cell:hover { background: #2e2e2e; }
+        .game-cell:hover { background: #282828; }
 
         /* --- MUSIC PLAYER MODAL --- */
         .music-modal {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: #141414;
+            background: #121212;
             z-index: 50;
             display: none;
             flex-direction: column;
@@ -778,7 +782,7 @@
         }
         .music-modal.active { display: flex; }
 
-        /* --- MODAL PILIHAN PESAN --- */
+        /* --- MODAL OPSI PESAN --- */
         .modal-overlay {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -790,7 +794,7 @@
         }
         .modal-overlay.active { display: flex; }
         .modal-sheet {
-            background: #202020;
+            background: #181818;
             width: 100%;
             border-top-left-radius: 16px;
             border-top-right-radius: 16px;
@@ -798,10 +802,11 @@
             display: flex;
             flex-direction: column;
             gap: 8px;
+            border-top: 1px solid #282828;
         }
         .modal-btn {
             padding: 12px;
-            background: #282828;
+            background: #222;
             border: none;
             border-radius: 8px;
             color: #fff;
@@ -809,7 +814,7 @@
             text-align: center;
             cursor: pointer;
         }
-        .modal-btn:hover { background: #333; }
+        .modal-btn:hover { background: #2a2a2a; }
         .modal-btn.danger { color: #ff5555; }
     </style>
 </head>
@@ -899,7 +904,7 @@
         <div class="app-header">
             <button class="icon-btn" id="btn-back-profile">←</button>
             <span class="header-username">Profil Saya</span>
-            <div style="width: 24px;"></div>
+            <div style="width: 36px;"></div>
         </div>
         <div class="profile-container">
             <div class="profile-avatar-wrapper" id="btn-change-photo">
@@ -1004,7 +1009,7 @@
 
     <!-- 8. MUSIC PLAYER MODAL -->
     <div id="music-modal" class="music-modal">
-        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #282828; padding-bottom: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #222; padding-bottom: 12px;">
             <span id="music-modal-title" style="font-size: 15px; font-weight: bold; color: #fff;">Mini Music</span>
             <button class="icon-btn" id="btn-close-music">✕</button>
         </div>
@@ -1051,7 +1056,7 @@
 
     <!-- 9. MUSIC ADMIN MODAL -->
     <div id="music-admin-modal" class="music-modal">
-        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #282828; padding-bottom: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #222; padding-bottom: 12px;">
             <span style="font-size: 15px; font-weight: bold; color: #fff;">Admin Musik Panel</span>
             <button class="icon-btn" id="btn-close-admin-music">✕</button>
         </div>
@@ -1086,7 +1091,7 @@
                     </div>
                 </div>
                 <button id="btn-save-new-song" class="btn-primary">Unggah ke Database</button>
-                <div style="margin-top: 16px; border-top: 1px solid #282828; padding-top: 12px;">
+                <div style="margin-top: 16px; border-top: 1px solid #222; padding-top: 12px;">
                     <span style="font-size: 12px; color: #aaa; display: block; margin-bottom: 8px;">Daftar Lagu (Hapus)</span>
                     <div id="admin-delete-list" style="display: flex; flex-direction: column; gap: 6px;"></div>
                 </div>
@@ -1100,7 +1105,7 @@
             <button class="modal-btn" id="opt-reply">Balas Pesan</button>
             <button class="modal-btn" id="opt-delete-me">Hapus untuk Saya</button>
             <button class="modal-btn danger" id="opt-delete-all">Hapus untuk Semua Orang</button>
-            <button class="modal-btn" id="opt-cancel" style="background: #181818; margin-top: 4px;">Batal</button>
+            <button class="modal-btn" id="opt-cancel" style="background: #121212; margin-top: 4px;">Batal</button>
         </div>
     </div>
 
