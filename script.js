@@ -96,6 +96,7 @@ let peerConnection = null;
 let signalingChannel = null;
 let isAudioOnlyCall = false;
 let iceCandidatesQueue = [];
+let isSettingRemoteAnswerPending = false;
 
 // Konfigurasi STUN/TURN Server Google & OpenRelay Gratis
 const iceServersConfig = {
@@ -859,7 +860,7 @@ if (btnSend) {
     btnSend.addEventListener('click', sendMessage);
 }
 
-// --- FITUR NATIVE WEBRTC + SUPABASE SIGNALING (DENGAN ICE BUFFER) ---
+// --- FITUR NATIVE WEBRTC + SUPABASE SIGNALING (DENGAN ICE BUFFER & HANDSHAKE RESOLVER) ---
 function setupWebRTCSignaling() {
     if (signalingChannel) supabaseClient.removeChannel(signalingChannel);
 
@@ -882,16 +883,26 @@ function setupWebRTCSignaling() {
                     await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
                     await processIceQueue();
                 } else if (data.type === 'answer') {
-                    callStatusText.textContent = 'Terhubung!';
-                    if (peerConnection && peerConnection.signalingState !== 'stable') {
+                    if (peerConnection && peerConnection.signalingState === 'have-local-offer') {
+                        isSettingRemoteAnswerPending = true;
                         await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+                        isSettingRemoteAnswerPending = false;
+                        
+                        callStatusText.textContent = 'Terhubung!';
                         await processIceQueue();
                     }
                 } else if (data.type === 'ice-candidate') {
-                    if (peerConnection && peerConnection.remoteDescription && peerConnection.remoteDescription.type) {
-                        await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                    const candidateObj = new RTCIceCandidate(data.candidate);
+                    
+                    if (
+                        peerConnection && 
+                        peerConnection.remoteDescription && 
+                        peerConnection.remoteDescription.type &&
+                        !isSettingRemoteAnswerPending
+                    ) {
+                        await peerConnection.addIceCandidate(candidateObj);
                     } else {
-                        iceCandidatesQueue.push(data.candidate);
+                        iceCandidatesQueue.push(candidateObj);
                     }
                 } else if (data.type === 'end-call') {
                     endWebRTCCall(false);
@@ -908,12 +919,12 @@ function setupWebRTCSignaling() {
 }
 
 async function processIceQueue() {
-    while (iceCandidatesQueue.length > 0) {
+    while (iceCandidatesQueue.length > 0 && peerConnection && peerConnection.remoteDescription) {
         const candidate = iceCandidatesQueue.shift();
         try {
-            await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+            await peerConnection.addIceCandidate(candidate);
         } catch (e) {
-            console.error("Gagal memproses antrean ICE:", e);
+            console.error("Gagal memproses antrean ICE candidate:", e);
         }
     }
 }
@@ -942,6 +953,17 @@ async function createPeerConnection(isVideo) {
         if (event.streams && event.streams[0]) {
             remoteVideo.srcObject = event.streams[0];
             callStatusText.textContent = 'Terhubung!';
+        }
+    };
+
+    peerConnection.oniceconnectionstatechange = () => {
+        if (peerConnection) {
+            const state = peerConnection.iceConnectionState;
+            if (state === 'connected' || state === 'completed') {
+                callStatusText.textContent = 'Terhubung!';
+            } else if (state === 'disconnected' || state === 'failed') {
+                callStatusText.textContent = 'Koneksi Terputus';
+            }
         }
     };
 
@@ -1022,6 +1044,7 @@ function endWebRTCCall(notifyPeer = true) {
     if (remoteVideo) remoteVideo.srcObject = null;
 
     iceCandidatesQueue = [];
+    isSettingRemoteAnswerPending = false;
     webrtcCallModal.classList.remove('active');
 }
 
